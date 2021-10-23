@@ -1,5 +1,5 @@
-mod lexer;
-mod util;
-mod colors;
+pub mod lexer;
+pub mod parser;
 
-pub use lexer::Lexer;
+pub mod util;
+mod colors;
