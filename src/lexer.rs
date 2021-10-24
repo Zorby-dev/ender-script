@@ -1,9 +1,9 @@
-use std::fmt::Debug;
 use crate::util::*;
+use std::fmt::Debug;
 
 pub enum Result<T> {
     Ok(T),
-    Err(Error)
+    Err(Error),
 }
 
 type ResultWrapper<T> = (Result<T>, Vec<Warning>);
@@ -12,28 +12,43 @@ use self::Result::*;
 
 #[allow(nonstandard_style)]
 fn IllegalCharacterError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error { name: String::from("Illegal Character"), details, start_pos, end_pos }
+    return Error {
+        name: String::from("Illegal Character"),
+        details,
+        start_pos,
+        end_pos,
+    };
 }
 
 #[allow(nonstandard_style)]
 fn ExpectedCharacterError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error { name: String::from("Expected Character"), details, start_pos, end_pos }
+    return Error {
+        name: String::from("Expected Character"),
+        details,
+        start_pos,
+        end_pos,
+    };
 }
 
 #[allow(nonstandard_style)]
 fn InvalidEscapeSequenceError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error { name: String::from("Invalid Escape Sequence"), details, start_pos, end_pos }
+    return Error {
+        name: String::from("Invalid Escape Sequence"),
+        details,
+        start_pos,
+        end_pos,
+    };
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
-	And,
-	Or,
-	Not,
-	If,
-	Else,
-	While,
-	Function,
+    And,
+    Or,
+    Not,
+    If,
+    Else,
+    While,
+    Function,
 }
 
 impl Keyword {
@@ -46,41 +61,41 @@ impl Keyword {
             "else" => Some(Keyword::Else),
             "while" => Some(Keyword::While),
             "function" => Some(Keyword::Function),
-            _ => None
+            _ => None,
         }
     }
 }
 
 #[derive(Clone, PartialEq)]
 pub enum TokenType {
-	Int(isize),
-	Float(f64),
-	Plus,
-	Minus,
-	Mul,
-	Div,
-	LParen,
-	RParen,
-	LCParen,
-	RCParen,
-	EOF,
-	Keyword(Keyword),
-	ID(String),
-	EQ,
-	EE,
-	NE,
-	LT,
-	GT,
-	LTE,
-	GTE,
-	Not,
-	And,
-	Or,
-	Comma,
+    Int(isize),
+    Float(f64),
+    Plus,
+    Minus,
+    Mul,
+    Div,
+    LParen,
+    RParen,
+    LCParen,
+    RCParen,
+    EOF,
+    Keyword(Keyword),
+    ID(String),
+    EQ,
+    EE,
+    NE,
+    LT,
+    GT,
+    LTE,
+    GTE,
+    Not,
+    And,
+    Or,
+    Comma,
     Colon,
-	String(String),
-	NL,
-    Placeholder
+    String(String),
+    NL,
+    Placeholder,
 }
 
 impl Debug for TokenType {
@@ -113,7 +128,7 @@ impl Debug for TokenType {
             TokenType::Colon => write!(f, "Colon"),
             TokenType::String(value) => write!(f, "String({:?})", value),
             TokenType::NL => write!(f, "NL"),
-            TokenType::Placeholder => write!(f, "Placeholder")
+            TokenType::Placeholder => write!(f, "Placeholder"),
         }
     }
 }
@@ -122,12 +137,16 @@ impl Debug for TokenType {
 pub struct Token {
     pub token_type: TokenType,
     pub start_pos: Position,
-    pub end_pos: Position
+    pub end_pos: Position,
 }
 
 impl Token {
     pub fn new(token_type: TokenType, start_pos: &Position, end_pos: &Position) -> Token {
-        return Token {token_type, start_pos: start_pos.clone(), end_pos: end_pos.clone()};
+        return Token {
+            token_type,
+            start_pos: start_pos.clone(),
+            end_pos: end_pos.clone(),
+        };
     }
 
     pub fn single_char(token_type: TokenType, pos: &Position) -> Token {
@@ -151,8 +170,7 @@ impl Debug for Token {
 fn get_current_char(pos: &Position) -> Option<char> {
     if pos.index < pos.text.len() {
         return Some(pos.text.chars().nth(pos.index).unwrap());
-    }
-    else {
+    } else {
         return None;
     }
 }
@@ -175,7 +193,7 @@ fn make_number(pos: &mut Position) -> Token {
         }
         if current_char == '.' {
             if dot_count == 1 {
-                break
+                break;
             }
             dot_count += 1;
         }
@@ -184,9 +202,17 @@ fn make_number(pos: &mut Position) -> Token {
     }
 
     if dot_count == 0 {
-        return Token::new(TokenType::Int(token_string.parse().unwrap()), &start_pos, pos)
+        return Token::new(
+            TokenType::Int(token_string.parse().unwrap()),
+            &start_pos,
+            pos,
+        );
     }
-    return Token::new(TokenType::Float(token_string.parse().unwrap()), &start_pos, pos)
+    return Token::new(
+        TokenType::Float(token_string.parse().unwrap()),
+        &start_pos,
+        pos,
+    );
 }
 
 fn make_identifier(pos: &mut Position) -> Token {
@@ -203,11 +229,16 @@ fn make_identifier(pos: &mut Position) -> Token {
 
     match Keyword::parse(&id_string) {
         Some(keyword) => Token::new(TokenType::Keyword(keyword), &start_pos, pos),
-        None => Token::new(TokenType::ID(id_string.clone()), &start_pos, pos)
+        None => Token::new(TokenType::ID(id_string.clone()), &start_pos, pos),
     }
 }
 
-fn make_combo_token(pos: &mut Position, default: TokenType, second: char, second_type: TokenType) -> Token {
+fn make_combo_token(
+    pos: &mut Position,
+    default: TokenType,
+    second: char,
+    second_type: TokenType,
+) -> Token {
     let mut token_type = default;
     let start_pos = pos.clone();
     advance(pos);
@@ -245,7 +276,11 @@ fn make_and(pos: &mut Position) -> Result<Token> {
             advance(&mut start_pos);
             let mut end_pos = pos.clone();
             advance(&mut end_pos);
-            return Err(ExpectedCharacterError(String::from("'&'"), start_pos, end_pos));
+            return Err(ExpectedCharacterError(
+                String::from("'&'"),
+                start_pos,
+                end_pos,
+            ));
         }
     }
 }
@@ -259,7 +294,11 @@ fn make_or(pos: &mut Position) -> Result<Token> {
             advance(&mut start_pos);
             let mut end_pos = pos.clone();
             advance(&mut end_pos);
-            return Err(ExpectedCharacterError(String::from("'|'"), start_pos, end_pos));
+            return Err(ExpectedCharacterError(
+                String::from("'|'"),
+                start_pos,
+                end_pos,
+            ));
         }
     }
 }
@@ -271,97 +310,91 @@ pub fn make_tokens(file_name: &str, text: &str) -> ResultWrapper<Vec<Token>> {
         details: String::from("Details"),
         name: String::from("Test"),
         start_pos: pos.clone(),
-        end_pos: pos.clone().advance('.').to_owned()
+        end_pos: pos.clone().advance('.').to_owned(),
     });
     let mut tokens: Vec<Token> = Vec::new();
     while let Some(current_char) = get_current_char(&pos) {
         if " \t".contains(current_char) {
             advance(&mut pos);
-        }
-        else if DIGITS.contains(current_char) {
+        } else if DIGITS.contains(current_char) {
             tokens.push(make_number(&mut pos));
-        }
-        else if ['\n', ';'].contains(&current_char) {
+        } else if ['\n', ';'].contains(&current_char) {
             tokens.push(Token::single_char(TokenType::NL, &pos));
             advance(&mut pos);
-        }
-        else if VALID_CHARS.contains(current_char) {
+        } else if VALID_CHARS.contains(current_char) {
             tokens.push(make_identifier(&mut pos));
-        }
-        else if current_char == '+' {
+        } else if current_char == '+' {
             tokens.push(Token::single_char(TokenType::Plus, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '-' {
+        } else if current_char == '-' {
             tokens.push(Token::single_char(TokenType::Minus, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '*' {
+        } else if current_char == '*' {
             tokens.push(Token::single_char(TokenType::Mul, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '/' {
+        } else if current_char == '/' {
             tokens.push(Token::single_char(TokenType::Div, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '(' {
+        } else if current_char == '(' {
             tokens.push(Token::single_char(TokenType::LParen, &pos));
             advance(&mut pos);
-        }
-        else if current_char == ')' {
+        } else if current_char == ')' {
             tokens.push(Token::single_char(TokenType::RParen, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '{' {
+        } else if current_char == '{' {
             tokens.push(Token::single_char(TokenType::LCParen, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '}' {
+        } else if current_char == '}' {
             tokens.push(Token::single_char(TokenType::RCParen, &pos));
             advance(&mut pos);
-        }
-        else if current_char == ',' {
+        } else if current_char == ',' {
             tokens.push(Token::single_char(TokenType::Comma, &pos));
             advance(&mut pos);
-        }
-        else if current_char == ':' {
+        } else if current_char == ':' {
             tokens.push(Token::single_char(TokenType::Colon, &pos));
             advance(&mut pos);
-        }
-        else if current_char == '=' {
+        } else if current_char == '=' {
             tokens.push(make_equals(&mut pos));
-        }
-        else if current_char == '!' {
+        } else if current_char == '!' {
             tokens.push(make_not(&mut pos));
-        }
-        else if current_char == '<' {
+        } else if current_char == '<' {
             tokens.push(make_less_than(&mut pos));
-        }
-        else if current_char == '>' {
+        } else if current_char == '>' {
             tokens.push(make_greater_than(&mut pos));
-        }
-        else if current_char == '&' {
+        } else if current_char == '&' {
             match make_and(&mut pos) {
-                Ok(token) => { tokens.push(token); },
-                Err(error) => { return (Err(error), warnings); }
+                Ok(token) => {
+                    tokens.push(token);
+                }
+                Err(error) => {
+                    return (Err(error), warnings);
+                }
             }
-        }
-        else if current_char == '|' {
+        } else if current_char == '|' {
             match make_or(&mut pos) {
-                Ok(token) => { tokens.push(token); },
-                Err(error) => { return (Err(error), warnings); }
+                Ok(token) => {
+                    tokens.push(token);
+                }
+                Err(error) => {
+                    return (Err(error), warnings);
+                }
             }
-        }
-        else if current_char == '"' {
+        } else if current_char == '"' {
             //tokens.push(make_string(&mut pos));
             todo!();
-        }
-        else {
+        } else {
             let start_pos = pos.clone();
             advance(&mut pos);
-            return (Err(IllegalCharacterError(format!("'{}'", current_char), start_pos, pos.clone())), warnings)
+            return (
+                Err(IllegalCharacterError(
+                    format!("'{}'", current_char),
+                    start_pos,
+                    pos.clone(),
+                )),
+                warnings,
+            );
         }
     }
     tokens.push(Token::single_char(TokenType::EOF, &pos));
-    return (Ok(tokens), warnings)
+    return (Ok(tokens), warnings);
 }
