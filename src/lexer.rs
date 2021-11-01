@@ -1,44 +1,14 @@
 use crate::util::*;
+use crate::message::{ Message, MessageType::{ IllegalCharacter, MissingCharacter } };
+use crate::message::details;
 use std::fmt::Debug;
 
 pub enum Result<T> {
     Ok(T),
-    Err(Error),
+    Err(Message),
 }
-
-type ResultWrapper<T> = (Result<T>, Vec<Warning>);
 
 use self::Result::*;
-
-#[allow(nonstandard_style)]
-fn IllegalCharacterError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error {
-        name: String::from("Illegal Character"),
-        details,
-        start_pos,
-        end_pos,
-    };
-}
-
-#[allow(nonstandard_style)]
-fn ExpectedCharacterError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error {
-        name: String::from("Expected Character"),
-        details,
-        start_pos,
-        end_pos,
-    };
-}
-
-#[allow(nonstandard_style)]
-fn InvalidEscapeSequenceError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error {
-        name: String::from("Invalid Escape Sequence"),
-        details,
-        start_pos,
-        end_pos,
-    };
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
@@ -150,7 +120,7 @@ impl Token {
     }
 
     pub fn single_char(token_type: TokenType, pos: &Position) -> Token {
-        return Token::new(token_type, pos, pos);
+        return Token::new(token_type, pos, pos.clone().advance());
     }
 
     pub fn is(&self, token_type: TokenType) -> bool {
@@ -176,8 +146,8 @@ fn get_current_char(pos: &Position) -> Option<char> {
 }
 
 fn advance(pos: &mut Position) -> Option<&Position> {
-    if let Some(current_char) = get_current_char(pos) {
-        return Some(pos.advance(current_char));
+    if let Some(_) = get_current_char(pos) {
+        return Some(pos.advance());
     }
     return None;
 }
@@ -276,10 +246,11 @@ fn make_and(pos: &mut Position) -> Result<Token> {
             advance(&mut start_pos);
             let mut end_pos = pos.clone();
             advance(&mut end_pos);
-            return Err(ExpectedCharacterError(
-                String::from("'&'"),
-                start_pos,
-                end_pos,
+            return Err(Message::error(
+                MissingCharacter,
+                details::MissingCharacter!("&"),
+                start_pos.clone(),
+                end_pos.clone()
             ));
         }
     }
@@ -294,24 +265,18 @@ fn make_or(pos: &mut Position) -> Result<Token> {
             advance(&mut start_pos);
             let mut end_pos = pos.clone();
             advance(&mut end_pos);
-            return Err(ExpectedCharacterError(
-                String::from("'|'"),
-                start_pos,
-                end_pos,
+            return Err(Message::error(
+                MissingCharacter,
+                details::MissingCharacter!("|"),
+                start_pos.clone(),
+                end_pos.clone()
             ));
         }
     }
 }
 
-pub fn make_tokens(file_name: &str, text: &str) -> ResultWrapper<Vec<Token>> {
-    let mut warnings: Vec<Warning> = Vec::new();
+pub fn make_tokens(file_name: &str, text: &str) -> Result<Vec<Token>> {
     let mut pos = Position::new(file_name, text);
-    warnings.push(Warning {
-        details: String::from("Details"),
-        name: String::from("Test"),
-        start_pos: pos.clone(),
-        end_pos: pos.clone().advance('.').to_owned(),
-    });
     let mut tokens: Vec<Token> = Vec::new();
     while let Some(current_char) = get_current_char(&pos) {
         if " \t".contains(current_char) {
@@ -367,7 +332,7 @@ pub fn make_tokens(file_name: &str, text: &str) -> ResultWrapper<Vec<Token>> {
                     tokens.push(token);
                 }
                 Err(error) => {
-                    return (Err(error), warnings);
+                    return Err(error);
                 }
             }
         } else if current_char == '|' {
@@ -376,7 +341,7 @@ pub fn make_tokens(file_name: &str, text: &str) -> ResultWrapper<Vec<Token>> {
                     tokens.push(token);
                 }
                 Err(error) => {
-                    return (Err(error), warnings);
+                    return Err(error);
                 }
             }
         } else if current_char == '"' {
@@ -385,16 +350,14 @@ pub fn make_tokens(file_name: &str, text: &str) -> ResultWrapper<Vec<Token>> {
         } else {
             let start_pos = pos.clone();
             advance(&mut pos);
-            return (
-                Err(IllegalCharacterError(
-                    format!("'{}'", current_char),
-                    start_pos,
-                    pos.clone(),
-                )),
-                warnings,
-            );
+            return Err(Message::error(
+                IllegalCharacter,
+                details::IllegalCharacter!(current_char),
+                start_pos.clone(),
+                pos.clone()
+            ));
         }
     }
-    tokens.push(Token::single_char(TokenType::EOF, &pos));
-    return (Ok(tokens), warnings);
+    tokens.push(Token::new(TokenType::EOF, &pos, pos.clone().forced_advance()));
+    return Ok(tokens);
 }

@@ -1,15 +1,6 @@
 use crate::lexer::{Keyword, Token, TokenType};
-use crate::util::{Error, Position};
-
-#[allow(nonstandard_style)]
-fn InvalidSyntaxError(details: String, start_pos: Position, end_pos: Position) -> Error {
-    return Error {
-        name: String::from("Invalid Syntax"),
-        details,
-        start_pos,
-        end_pos,
-    };
-}
+use crate::util::Position;
+use crate::message::{Message, MessageType::*, details};
 
 #[derive(Clone, Debug)]
 enum NodeType {
@@ -28,6 +19,7 @@ enum NodeType {
     FunctionDeclaration {
         name: Token,
         args: Box<Node>,
+        typ: Option<Token>,
         expr: Box<Node>,
     },
     FunctionCall {
@@ -63,6 +55,11 @@ enum NodeType {
     },
     Arguments {
         args: Vec<Box<Node>>,
+    },
+    Parameter {
+        name: Token,
+        typ: Option<Token>,
+        value: Option<Box<Node>>,
     },
     Parameters {
         params: Vec<Box<Node>>,
@@ -120,12 +117,14 @@ impl Node {
         start_pos: &Position,
         name: Token,
         args: &Node,
+        typ: Option<Token>,
         expr: &Node,
     ) -> Self {
         Node {
             node_type: NodeType::FunctionDeclaration {
                 name: name.clone(),
                 args: Box::new(args.clone()),
+                typ,
                 expr: Box::new(expr.clone()),
             },
             start_pos: start_pos.clone(),
@@ -244,6 +243,28 @@ impl Node {
             end_pos: end_pos.clone(),
         }
     }
+    pub fn parameter(name: Token, typ: Option<Token>, value: Option<Node>) -> Self {
+        match value {
+            Some(value) => Node {
+                node_type: NodeType::Parameter {
+                    name: name.clone(),
+                    typ,
+                    value: Some(Box::new(value)),
+                },
+                start_pos: name.start_pos.clone(),
+                end_pos: name.end_pos.clone(),
+            },
+            None => Node {
+                node_type: NodeType::Parameter {
+                    name: name.clone(),
+                    typ,
+                    value: None,
+                },
+                start_pos: name.start_pos.clone(),
+                end_pos: name.end_pos.clone(),
+            },
+        }
+    }
     pub fn parameters(start_pos: &Position, parameters: Vec<Node>, end_pos: &Position) -> Self {
         let mut boxed_parameters: Vec<Box<Node>> = Vec::new();
         for statement in parameters {
@@ -262,7 +283,7 @@ impl Node {
 #[derive(Clone)]
 pub enum Result {
     Success(Node),
-    Failure(Error),
+    Failure(Message),
 }
 
 use self::Result::*;
@@ -322,7 +343,7 @@ impl ParseRegister {
         };
     }
 
-    pub fn failure(&mut self, error: Error) -> ParseResult {
+    pub fn failure(&mut self, error: Message) -> ParseResult {
         self.result = Some(Failure(error));
         return ParseResult {
             result: self.result.clone().unwrap(),
@@ -414,10 +435,11 @@ fn if_expression(state: &mut State) -> ParseResult {
     advance(state);
 
     if !state.current_token.is(TokenType::LParen) {
-        return reg.failure(InvalidSyntaxError(
-            String::from("Expected '('"),
+        return reg.failure(Message::error (
+            MissingConditionOpening,
+            details::MissingConditionOpening!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone(),
+            state.current_token.end_pos.clone()
         ));
     }
 
@@ -435,10 +457,11 @@ fn if_expression(state: &mut State) -> ParseResult {
     }
 
     if !state.current_token.is(TokenType::RParen) {
-        return reg.failure(InvalidSyntaxError(
-            String::from("Expected ')'"),
+        return reg.failure(Message::error (
+            MissingConditionClosure,
+            details::MissingConditionClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone(),
+            state.current_token.end_pos.clone()
         ));
     }
 
@@ -472,18 +495,261 @@ fn if_expression(state: &mut State) -> ParseResult {
     return reg.success(Node::r#if(&start_pos, &condition, &expr, else_case));
 }
 
-fn while_expression(mut state: &mut State) -> ParseResult {
-    todo!();
+fn while_expression(state: &mut State) -> ParseResult {
+    let mut reg = ParseRegister::new();
+    let start_pos = state.current_token.start_pos.clone();
+
+    reg.register_advancement();
+    advance(state);
+
+    if !state.current_token.is(TokenType::LParen) {
+        return reg.failure(Message::error (
+            MissingConditionOpening,
+            details::MissingConditionOpening!(),
+            state.current_token.start_pos.clone(),
+            state.current_token.end_pos.clone()
+        ));
+    }
+
+    reg.register_advancement();
+    advance(state);
+
+    let condition: Node;
+    match reg.register(&expression(state)) {
+        Success(node) => {
+            condition = node;
+        }
+        Failure(_) => {
+            return reg.pack();
+        }
+    }
+
+    if !state.current_token.is(TokenType::RParen) {
+        return reg.failure(Message::error (
+            MissingConditionClosure,
+            details::MissingConditionClosure!(),
+            state.current_token.start_pos.clone(),
+            state.current_token.end_pos.clone()
+        ));
+    }
+
+    reg.register_advancement();
+    advance(state);
+
+    let expr: Node;
+    match reg.register(&scope(state)) {
+        Success(node) => { expr = node; },
+        Failure(_) => { return reg.pack(); }
+    }
+
+    return reg.success(Node::r#while(&start_pos, &condition, &expr));
 }
 
-fn function_declaration(mut state: &mut State) -> ParseResult {
-    todo!();
+fn parameters(state: &mut State) -> ParseResult {
+    let mut reg = ParseRegister::new();
+    let mut params: Vec<Node> = Vec::new();
+    let start_pos = state.current_token.start_pos.clone();
+
+    reg.register_advancement();
+    advance(state);
+
+    while !(state.current_token.is(TokenType::RParen)) {
+        
+        match &state.current_token.token_type {
+            TokenType::ID(name) => {
+                let var_name = state.current_token.clone();
+
+                reg.register_advancement();
+                advance(state);
+
+                if !state.current_token.is(TokenType::Colon) {
+                    return reg.failure(Message::error (
+                        MissingMemberDeclaration,
+                        details::MissingMemberDeclaration!(name, "parameter"),
+                        state.current_token.start_pos.clone(),
+                        state.current_token.end_pos.clone()
+                    ));
+                }
+
+                reg.register_advancement();
+                advance(state);
+
+                let var_type: Option<Token>;
+                let value: Option<Node>;
+                match state.current_token.token_type {
+                    TokenType::ID(_) => {
+                        var_type = Some(state.current_token.clone());
+                        reg.register_advancement();
+                        advance(state);
+                        match state.current_token.token_type {
+                            TokenType::EQ => {
+                                reg.register_advancement();
+                                advance(state);
+                                let expr: Node;
+                                match reg.register(&expression(state)) {
+                                    Success(node) => {
+                                        expr = node;
+                                    }
+                                    Failure(_) => {
+                                        return reg.pack();
+                                    }
+                                }
+                                value = Some(expr);
+                            }
+                            _ => {
+                                value = None;
+                            }
+                        }
+                    }
+                    TokenType::EQ => {
+                        var_type = None;
+                        reg.register_advancement();
+                        advance(state);
+                        let expr: Node;
+                        match reg.register(&expression(state)) {
+                            Success(node) => {
+                                expr = node;
+                            }
+                            Failure(_) => {
+                                return reg.pack();
+                            }
+                        }
+                        value = Some(expr);
+                    }
+                    _ => {
+                        return reg.failure(Message::error (
+                            MissingMemberTypeOrValueAssignment,
+                            details::MissingMemberTypeOrValueAssignment!(name, "parameter"),
+                            state.current_token.start_pos.clone(),
+                            state.current_token.end_pos.clone()
+                        ));
+                    }
+                }
+                params.push(Node::parameter(var_name, var_type, value));
+            },
+            _ => {
+                return reg.failure(Message::error (
+                    MissingMemberName,
+                    details::MissingMemberName!("parameter"),
+                    state.current_token.start_pos.clone(),
+                    state.current_token.end_pos.clone()
+                ));
+            }
+        }
+
+        if !(state.current_token.is(TokenType::Comma)) {
+            break;
+        }
+
+        reg.register_advancement();
+        advance(state);
+    }
+
+    if !(state.current_token.is(TokenType::RParen)) {
+        return reg.failure(Message::error (
+            MissingTupleClosure,
+            details::MissingTupleClosure!(),
+            state.current_token.start_pos.clone(),
+            state.current_token.end_pos.clone()
+        ));
+    }
+
+    reg.register_advancement();
+    advance(state);
+
+    return reg.success(Node::parameters(
+        &start_pos,
+        params,
+        &state.current_token.end_pos,
+    ));
+}
+
+fn function_declaration(state: &mut State) -> ParseResult {
+    let mut reg = ParseRegister::new();
+    let start_pos = state.current_token.start_pos.clone();
+
+    reg.register_advancement();
+    advance(state);
+
+    match state.current_token.token_type {
+        TokenType::ID(_) => {
+            let name = state.current_token.clone();
+
+            reg.register_advancement();
+            advance(state);
+
+            if !state.current_token.is(TokenType::LParen) {
+                return reg.failure(Message::error (
+                    MissingTupleOpening,
+                    details::MissingTupleOpening!(),
+                    state.current_token.start_pos.clone(),
+                    state.current_token.end_pos.clone()
+                ));
+            }
+
+            let args: Node;
+            match reg.register(&parameters(state)) {
+                Success(node) => {
+                    args = node;
+                },
+                Failure(_) => {
+                    return reg.pack();
+                }
+            }
+
+            let mut typ: Option<Token> = None;
+            if state.current_token.is(TokenType::Colon) {
+                reg.register_advancement();
+                advance(state);
+
+                match state.current_token.token_type {
+                    TokenType::ID(_) => {
+                        typ = Some(state.current_token.clone());
+                    },
+                    _ => {
+                        return reg.failure(Message::error (
+                            MissingMemberType,
+                            details::MissingMemberType!("return"),
+                            state.current_token.start_pos.clone(),
+                            state.current_token.end_pos.clone()
+                        ));
+                    }
+                }
+
+                reg.register_advancement();
+                advance(state);
+            }
+
+            let expr: Node;
+            match reg.register(&scope(state)) {
+                Success(node) => {
+                    expr = node;
+                },
+                Failure(_) => {
+                    return reg.pack();
+                }
+            }
+
+            return reg.success(Node::function_declaration(&start_pos, name, &args, typ, &expr));
+        },
+        _ => {
+            return reg.failure(Message::error (
+                MissingMemberName,
+                details::MissingMemberName!("function"),
+                state.current_token.start_pos.clone(),
+                state.current_token.end_pos.clone()
+            ));
+        }
+    }
 }
 
 fn arguments(state: &mut State) -> ParseResult {
     let mut reg = ParseRegister::new();
     let mut args: Vec<Node> = Vec::new();
     let start_pos = state.current_token.start_pos.clone();
+
+    reg.register_advancement();
+    advance(state);
 
     while !(state.current_token.is(TokenType::RParen)) {
         match reg.register(&expression(state)) {
@@ -504,10 +770,11 @@ fn arguments(state: &mut State) -> ParseResult {
     }
 
     if !(state.current_token.is(TokenType::RParen)) {
-        return reg.failure(InvalidSyntaxError(
-            String::from("Expected ')'"),
+        return reg.failure(Message::error (
+            MissingTupleClosure,
+            details::MissingTupleClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone(),
+            state.current_token.end_pos.clone()
         ));
     }
 
@@ -545,10 +812,11 @@ fn factor(state: &mut State) -> ParseResult {
                     return reg.success(expr);
                 }
                 _ => {
-                    return reg.failure(InvalidSyntaxError(
-                        String::from("Expected ')'"),
+                    return reg.failure(Message::error (
+                        MissingTupleClosure,
+                        details::MissingTupleClosure!(),
                         state.current_token.start_pos.clone(),
-                        state.current_token.end_pos.clone(),
+                        state.current_token.end_pos.clone()
                     ));
                 }
             }
@@ -589,7 +857,7 @@ fn factor(state: &mut State) -> ParseResult {
             }
             return reg.success(expr);
         }
-        TokenType::ID(_) => {
+        TokenType::ID(var_string_name) => {
             let var_name = state.current_token.clone();
 
             reg.register_advancement();
@@ -612,9 +880,6 @@ fn factor(state: &mut State) -> ParseResult {
                     return reg.success(Node::var_assign(var_name, &expr));
                 }
                 TokenType::LParen => {
-                    reg.register_advancement();
-                    advance(state);
-
                     let args: Node;
                     match reg.register(&arguments(state)) {
                         Success(node) => {
@@ -683,10 +948,11 @@ fn factor(state: &mut State) -> ParseResult {
                             value = Some(expr);
                         }
                         _ => {
-                            return reg.failure(InvalidSyntaxError(
-                                String::from("Expected variable type or '='"),
+                            return reg.failure(Message::error (
+                                MissingMemberTypeOrValueAssignment,
+                                details::MissingMemberTypeOrValueAssignment!(var_string_name, "variable"),
                                 state.current_token.start_pos.clone(),
-                                state.current_token.end_pos.clone(),
+                                state.current_token.end_pos.clone()
                             ));
                         }
                     }
@@ -721,11 +987,12 @@ fn factor(state: &mut State) -> ParseResult {
             todo!();
         }
         _ => {
-            return reg.failure(InvalidSyntaxError(
-                String::from("Expected expression"),
-                token.start_pos,
-                token.end_pos,
-            ))
+            return reg.failure(Message::error (
+                MissingExpression,
+                details::MissingExpression!(),
+                state.current_token.start_pos.clone(),
+                state.current_token.end_pos.clone()
+            ));
         }
     }
 }
@@ -909,10 +1176,11 @@ fn scope(state: &mut State) -> ParseResult {
             }
 
             if !state.current_token.is(TokenType::RCParen) {
-                return reg.failure(InvalidSyntaxError(
-                    String::from("Expected '}'"),
+                return reg.failure(Message::error (
+                    MissingCodeblockClosure,
+                    details::MissingCodeblockClosure!(),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone(),
+                    state.current_token.end_pos.clone()
                 ));
             }
 
@@ -943,10 +1211,11 @@ pub fn parse(tokens: Vec<Token>) -> Result {
         if !state.current_token.is(TokenType::EOF) {
             return result
                 .to_register()
-                .failure(InvalidSyntaxError(
-                    String::from(""),
+                .failure(Message::error (
+                    UnexpectedEOF,
+                    details::UnexpectedEOF!(),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone(),
+                    state.current_token.end_pos.clone()
                 ))
                 .result;
         }

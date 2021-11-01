@@ -1,1 +1,3 @@
-a: uint = 5 + 5
+function fun(a: a, b: number) {
+
+}

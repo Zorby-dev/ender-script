@@ -3,8 +3,9 @@ pub mod parser;
 
 pub mod util;
 mod colors;
+pub mod message;
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use std::fs;
     use super::lexer;
@@ -15,7 +16,10 @@ mod tests {
         let content = fs::read_to_string(&file_name).unwrap();
         let result = lexer::make_tokens(&file_name, &content);
         match result.0 {
-            lexer::Result::Err(_) => panic!(),
+            lexer::Result::Err(mut error) => {
+                println!("{}", error.to_string());
+                panic!();
+            },
             lexer::Result::Ok(tokens) => tokens
         }
     }
@@ -23,13 +27,16 @@ mod tests {
     fn parse(tokens: Vec<lexer::Token>) -> parser::Node {
         let result = parser::parse(tokens);
         match result {
-            parser::Result::Failure(_) => panic!(),
+            parser::Result::Failure(mut error) => {
+                println!("{}", error.to_string());
+                panic!();
+            },
             parser::Result::Success(node) => node
         }
     }
 
     #[test]
     fn test0() {
-        parse(make_tokens("test0"));
+        println!("{:?}", parse(make_tokens("test0")));
     }
-}
+}*/
