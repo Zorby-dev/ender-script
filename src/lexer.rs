@@ -1,14 +1,13 @@
-use crate::util::*;
-use crate::message::{ Message, MessageType::{ IllegalCharacter, MissingCharacter } };
 use crate::message::details;
+use crate::message::{
+    Message,
+    MessageVariant::{IllegalCharacter, MissingCharacter},
+};
+use crate::util::Position;
 use std::fmt::Debug;
 
-pub enum Result<T> {
-    Ok(T),
-    Err(Message),
-}
-
-use self::Result::*;
+pub static DIGITS: &str = "0123456789";
+pub static VALID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
@@ -38,8 +37,12 @@ impl Keyword {
 
 #[derive(Clone, PartialEq)]
 pub enum TokenType {
-    Int(isize),
-    Float(f64),
+    //Byte(i8),
+    //Short(i16),
+    Int(i32),
+    //Long(i64),
+    Float(f32),
+    //Double(f64),
     Plus,
     Minus,
     Mul,
@@ -237,7 +240,7 @@ fn make_greater_than(pos: &mut Position) -> Token {
     return make_combo_token(pos, TokenType::GT, '=', TokenType::GTE);
 }
 
-fn make_and(pos: &mut Position) -> Result<Token> {
+fn make_and(pos: &mut Position) -> Result<Token, Message> {
     let mut start_pos = pos.clone();
     let token = make_combo_token(pos, TokenType::Placeholder, '&', TokenType::And);
     match token.token_type {
@@ -248,15 +251,15 @@ fn make_and(pos: &mut Position) -> Result<Token> {
             advance(&mut end_pos);
             return Err(Message::error(
                 MissingCharacter,
-                details::MissingCharacter!("&"),
+                details::MissingCharacter!("&", "an and operator"),
                 start_pos.clone(),
-                end_pos.clone()
+                end_pos.clone(),
             ));
         }
     }
 }
 
-fn make_or(pos: &mut Position) -> Result<Token> {
+fn make_or(pos: &mut Position) -> Result<Token, Message> {
     let mut start_pos = pos.clone();
     let token = make_combo_token(pos, TokenType::Placeholder, '|', TokenType::Or);
     match token.token_type {
@@ -267,15 +270,15 @@ fn make_or(pos: &mut Position) -> Result<Token> {
             advance(&mut end_pos);
             return Err(Message::error(
                 MissingCharacter,
-                details::MissingCharacter!("|"),
+                details::MissingCharacter!("|", "an or operator"),
                 start_pos.clone(),
-                end_pos.clone()
+                end_pos.clone(),
             ));
         }
     }
 }
 
-pub fn make_tokens(file_name: &str, text: &str) -> Result<Vec<Token>> {
+pub fn make_tokens(file_name: &str, text: &str) -> Result<Vec<Token>, Message> {
     let mut pos = Position::new(file_name, text);
     let mut tokens: Vec<Token> = Vec::new();
     while let Some(current_char) = get_current_char(&pos) {
@@ -354,10 +357,14 @@ pub fn make_tokens(file_name: &str, text: &str) -> Result<Vec<Token>> {
                 IllegalCharacter,
                 details::IllegalCharacter!(current_char),
                 start_pos.clone(),
-                pos.clone()
+                pos.clone(),
             ));
         }
     }
-    tokens.push(Token::new(TokenType::EOF, &pos, pos.clone().forced_advance()));
+    tokens.push(Token::new(
+        TokenType::EOF,
+        &pos,
+        pos.clone().forced_advance(),
+    ));
     return Ok(tokens);
 }

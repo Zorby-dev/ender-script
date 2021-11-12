@@ -1,9 +1,9 @@
 use crate::lexer::{Keyword, Token, TokenType};
+use crate::message::{details, Message, MessageVariant::*};
 use crate::util::Position;
-use crate::message::{Message, MessageType::*, details};
 
 #[derive(Clone, Debug)]
-enum NodeType {
+pub enum NodeType {
     VarAccess {
         name: Token,
     },
@@ -68,9 +68,9 @@ enum NodeType {
 
 #[derive(Clone, Debug)]
 pub struct Node {
-    node_type: NodeType,
-    start_pos: Position,
-    end_pos: Position,
+    pub node_type: NodeType,
+    pub start_pos: Position,
+    pub end_pos: Position,
 }
 
 impl Node {
@@ -280,16 +280,14 @@ impl Node {
     }
 }
 
-#[derive(Clone)]
-pub enum Result {
-    Success(Node),
-    Failure(Message),
+struct State<'a> {
+    index: usize,
+    current_token: &'a Token,
+    tokens: &'a Vec<Token>,
 }
 
-use self::Result::*;
-
 pub struct ParseRegister {
-    result: Option<Result>,
+    result: Option<Result<Node, Message>>,
     last_registered_advance_count: usize,
     advance_count: usize,
     to_reverse_count: usize,
@@ -311,30 +309,30 @@ impl ParseRegister {
         return self;
     }
 
-    pub fn register(&mut self, result: &ParseResult) -> Result {
+    pub fn register(&mut self, result: &ParseResult) -> Result<Node, Message> {
         self.last_registered_advance_count = result.advance_count;
         self.advance_count += result.advance_count;
         match &result.result {
-            Success(node) => Success(node.clone()),
-            Failure(error) => {
-                self.result = Some(Failure(error.clone()));
-                return Failure(error.clone());
+            Ok(node) => Ok(node.clone()),
+            Err(error) => {
+                self.result = Some(Err(error.clone()));
+                return Err(error.clone());
             }
         }
     }
 
-    pub fn try_register(&mut self, result: &ParseResult) -> Result {
+    pub fn try_register(&mut self, result: &ParseResult) -> Result<Node, Message> {
         match &result.result {
-            Success(_) => self.register(result),
-            Failure(error) => {
+            Ok(_) => self.register(result),
+            Err(error) => {
                 self.to_reverse_count = result.advance_count;
-                return Failure(error.clone());
+                return Err(error.clone());
             }
         }
     }
 
     pub fn success(&mut self, node: Node) -> ParseResult {
-        self.result = Some(Success(node));
+        self.result = Some(Ok(node));
         return ParseResult {
             result: self.result.clone().unwrap(),
             last_registered_advance_count: self.last_registered_advance_count,
@@ -344,7 +342,7 @@ impl ParseRegister {
     }
 
     pub fn failure(&mut self, error: Message) -> ParseResult {
-        self.result = Some(Failure(error));
+        self.result = Some(Err(error));
         return ParseResult {
             result: self.result.clone().unwrap(),
             last_registered_advance_count: self.last_registered_advance_count,
@@ -369,7 +367,7 @@ impl ParseRegister {
 
     pub fn failed(&self) -> bool {
         match self.result {
-            Some(Failure(_)) => true,
+            Some(Err(_)) => true,
             Some(_) => false,
             None => false,
         }
@@ -377,21 +375,15 @@ impl ParseRegister {
 
     pub fn succeeded(&self) -> bool {
         match self.result {
-            Some(Success(_)) => true,
+            Some(Err(_)) => true,
             Some(_) => false,
             None => false,
         }
     }
 }
 
-struct State<'a> {
-    index: usize,
-    current_token: &'a Token,
-    tokens: &'a Vec<Token>,
-}
-
 pub struct ParseResult {
-    result: Result,
+    result: Result<Node, Message>,
     last_registered_advance_count: usize,
     advance_count: usize,
     to_reverse_count: usize,
@@ -435,11 +427,11 @@ fn if_expression(state: &mut State) -> ParseResult {
     advance(state);
 
     if !state.current_token.is(TokenType::LParen) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingConditionOpening,
             details::MissingConditionOpening!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -448,20 +440,20 @@ fn if_expression(state: &mut State) -> ParseResult {
 
     let condition: Node;
     match reg.register(&expression(state)) {
-        Success(node) => {
+        Ok(node) => {
             condition = node;
         }
-        Failure(_) => {
+        Err(_) => {
             return reg.pack();
         }
     }
 
     if !state.current_token.is(TokenType::RParen) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingConditionClosure,
             details::MissingConditionClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -470,10 +462,10 @@ fn if_expression(state: &mut State) -> ParseResult {
 
     let expr: Node;
     match reg.register(&scope(state)) {
-        Success(node) => {
+        Ok(node) => {
             expr = node;
         }
-        Failure(_) => {
+        Err(_) => {
             return reg.pack();
         }
     }
@@ -483,10 +475,10 @@ fn if_expression(state: &mut State) -> ParseResult {
         advance(state);
 
         match reg.register(&scope(state)) {
-            Success(node) => {
+            Ok(node) => {
                 else_case = Some(node);
             }
-            Failure(_) => {
+            Err(_) => {
                 return reg.pack();
             }
         }
@@ -503,11 +495,11 @@ fn while_expression(state: &mut State) -> ParseResult {
     advance(state);
 
     if !state.current_token.is(TokenType::LParen) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingConditionOpening,
             details::MissingConditionOpening!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -516,20 +508,20 @@ fn while_expression(state: &mut State) -> ParseResult {
 
     let condition: Node;
     match reg.register(&expression(state)) {
-        Success(node) => {
+        Ok(node) => {
             condition = node;
         }
-        Failure(_) => {
+        Err(_) => {
             return reg.pack();
         }
     }
 
     if !state.current_token.is(TokenType::RParen) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingConditionClosure,
             details::MissingConditionClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -538,8 +530,12 @@ fn while_expression(state: &mut State) -> ParseResult {
 
     let expr: Node;
     match reg.register(&scope(state)) {
-        Success(node) => { expr = node; },
-        Failure(_) => { return reg.pack(); }
+        Ok(node) => {
+            expr = node;
+        }
+        Err(_) => {
+            return reg.pack();
+        }
     }
 
     return reg.success(Node::r#while(&start_pos, &condition, &expr));
@@ -554,7 +550,6 @@ fn parameters(state: &mut State) -> ParseResult {
     advance(state);
 
     while !(state.current_token.is(TokenType::RParen)) {
-        
         match &state.current_token.token_type {
             TokenType::ID(name) => {
                 let var_name = state.current_token.clone();
@@ -563,11 +558,11 @@ fn parameters(state: &mut State) -> ParseResult {
                 advance(state);
 
                 if !state.current_token.is(TokenType::Colon) {
-                    return reg.failure(Message::error (
+                    return reg.failure(Message::error(
                         MissingMemberDeclaration,
                         details::MissingMemberDeclaration!(name, "parameter"),
                         state.current_token.start_pos.clone(),
-                        state.current_token.end_pos.clone()
+                        state.current_token.end_pos.clone(),
                     ));
                 }
 
@@ -587,10 +582,10 @@ fn parameters(state: &mut State) -> ParseResult {
                                 advance(state);
                                 let expr: Node;
                                 match reg.register(&expression(state)) {
-                                    Success(node) => {
+                                    Ok(node) => {
                                         expr = node;
                                     }
-                                    Failure(_) => {
+                                    Err(_) => {
                                         return reg.pack();
                                     }
                                 }
@@ -607,32 +602,32 @@ fn parameters(state: &mut State) -> ParseResult {
                         advance(state);
                         let expr: Node;
                         match reg.register(&expression(state)) {
-                            Success(node) => {
+                            Ok(node) => {
                                 expr = node;
                             }
-                            Failure(_) => {
+                            Err(_) => {
                                 return reg.pack();
                             }
                         }
                         value = Some(expr);
                     }
                     _ => {
-                        return reg.failure(Message::error (
+                        return reg.failure(Message::error(
                             MissingMemberTypeOrValueAssignment,
                             details::MissingMemberTypeOrValueAssignment!(name, "parameter"),
                             state.current_token.start_pos.clone(),
-                            state.current_token.end_pos.clone()
+                            state.current_token.end_pos.clone(),
                         ));
                     }
                 }
                 params.push(Node::parameter(var_name, var_type, value));
-            },
+            }
             _ => {
-                return reg.failure(Message::error (
+                return reg.failure(Message::error(
                     MissingMemberName,
                     details::MissingMemberName!("parameter"),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone()
+                    state.current_token.end_pos.clone(),
                 ));
             }
         }
@@ -646,11 +641,11 @@ fn parameters(state: &mut State) -> ParseResult {
     }
 
     if !(state.current_token.is(TokenType::RParen)) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingTupleClosure,
             details::MissingTupleClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -679,20 +674,20 @@ fn function_declaration(state: &mut State) -> ParseResult {
             advance(state);
 
             if !state.current_token.is(TokenType::LParen) {
-                return reg.failure(Message::error (
+                return reg.failure(Message::error(
                     MissingTupleOpening,
                     details::MissingTupleOpening!(),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone()
+                    state.current_token.end_pos.clone(),
                 ));
             }
 
             let args: Node;
             match reg.register(&parameters(state)) {
-                Success(node) => {
+                Ok(node) => {
                     args = node;
-                },
-                Failure(_) => {
+                }
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -705,13 +700,13 @@ fn function_declaration(state: &mut State) -> ParseResult {
                 match state.current_token.token_type {
                     TokenType::ID(_) => {
                         typ = Some(state.current_token.clone());
-                    },
+                    }
                     _ => {
-                        return reg.failure(Message::error (
+                        return reg.failure(Message::error(
                             MissingMemberType,
                             details::MissingMemberType!("return"),
                             state.current_token.start_pos.clone(),
-                            state.current_token.end_pos.clone()
+                            state.current_token.end_pos.clone(),
                         ));
                     }
                 }
@@ -722,22 +717,24 @@ fn function_declaration(state: &mut State) -> ParseResult {
 
             let expr: Node;
             match reg.register(&scope(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
-                },
-                Failure(_) => {
+                }
+                Err(_) => {
                     return reg.pack();
                 }
             }
 
-            return reg.success(Node::function_declaration(&start_pos, name, &args, typ, &expr));
-        },
+            return reg.success(Node::function_declaration(
+                &start_pos, name, &args, typ, &expr,
+            ));
+        }
         _ => {
-            return reg.failure(Message::error (
+            return reg.failure(Message::error(
                 MissingMemberName,
                 details::MissingMemberName!("function"),
                 state.current_token.start_pos.clone(),
-                state.current_token.end_pos.clone()
+                state.current_token.end_pos.clone(),
             ));
         }
     }
@@ -753,10 +750,10 @@ fn arguments(state: &mut State) -> ParseResult {
 
     while !(state.current_token.is(TokenType::RParen)) {
         match reg.register(&expression(state)) {
-            Success(node) => {
+            Ok(node) => {
                 args.push(node);
             }
-            Failure(_) => {
+            Err(_) => {
                 return reg.pack();
             }
         }
@@ -770,11 +767,11 @@ fn arguments(state: &mut State) -> ParseResult {
     }
 
     if !(state.current_token.is(TokenType::RParen)) {
-        return reg.failure(Message::error (
+        return reg.failure(Message::error(
             MissingTupleClosure,
             details::MissingTupleClosure!(),
             state.current_token.start_pos.clone(),
-            state.current_token.end_pos.clone()
+            state.current_token.end_pos.clone(),
         ));
     }
 
@@ -798,10 +795,10 @@ fn factor(state: &mut State) -> ParseResult {
             advance(state);
             let expr: Node;
             match reg.register(&expression(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -812,11 +809,11 @@ fn factor(state: &mut State) -> ParseResult {
                     return reg.success(expr);
                 }
                 _ => {
-                    return reg.failure(Message::error (
+                    return reg.failure(Message::error(
                         MissingTupleClosure,
                         details::MissingTupleClosure!(),
                         state.current_token.start_pos.clone(),
-                        state.current_token.end_pos.clone()
+                        state.current_token.end_pos.clone(),
                     ));
                 }
             }
@@ -824,10 +821,10 @@ fn factor(state: &mut State) -> ParseResult {
         TokenType::Keyword(Keyword::If) => {
             let expr: Node;
             match reg.register(&if_expression(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -836,10 +833,10 @@ fn factor(state: &mut State) -> ParseResult {
         TokenType::Keyword(Keyword::While) => {
             let expr: Node;
             match reg.register(&while_expression(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -848,10 +845,10 @@ fn factor(state: &mut State) -> ParseResult {
         TokenType::Keyword(Keyword::Function) => {
             let expr: Node;
             match reg.register(&function_declaration(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -870,10 +867,10 @@ fn factor(state: &mut State) -> ParseResult {
 
                     let expr: Node;
                     match reg.register(&expression(state)) {
-                        Success(node) => {
+                        Ok(node) => {
                             expr = node;
                         }
-                        Failure(_) => {
+                        Err(_) => {
                             return reg.pack();
                         }
                     }
@@ -882,10 +879,10 @@ fn factor(state: &mut State) -> ParseResult {
                 TokenType::LParen => {
                     let args: Node;
                     match reg.register(&arguments(state)) {
-                        Success(node) => {
+                        Ok(node) => {
                             args = node;
                         }
-                        Failure(_) => {
+                        Err(_) => {
                             return reg.pack();
                         }
                     }
@@ -916,10 +913,10 @@ fn factor(state: &mut State) -> ParseResult {
 
                                     let expr: Node;
                                     match reg.register(&expression(state)) {
-                                        Success(node) => {
+                                        Ok(node) => {
                                             expr = node;
                                         }
-                                        Failure(_) => {
+                                        Err(_) => {
                                             return reg.pack();
                                         }
                                     }
@@ -938,21 +935,24 @@ fn factor(state: &mut State) -> ParseResult {
 
                             let expr: Node;
                             match reg.register(&expression(state)) {
-                                Success(node) => {
+                                Ok(node) => {
                                     expr = node;
                                 }
-                                Failure(_) => {
+                                Err(_) => {
                                     return reg.pack();
                                 }
                             }
                             value = Some(expr);
                         }
                         _ => {
-                            return reg.failure(Message::error (
+                            return reg.failure(Message::error(
                                 MissingMemberTypeOrValueAssignment,
-                                details::MissingMemberTypeOrValueAssignment!(var_string_name, "variable"),
+                                details::MissingMemberTypeOrValueAssignment!(
+                                    var_string_name,
+                                    "variable"
+                                ),
                                 state.current_token.start_pos.clone(),
-                                state.current_token.end_pos.clone()
+                                state.current_token.end_pos.clone(),
                             ));
                         }
                     }
@@ -969,10 +969,10 @@ fn factor(state: &mut State) -> ParseResult {
 
             let node: Node;
             match reg.register(&factor(state)) {
-                Success(nod) => {
+                Ok(nod) => {
                     node = nod;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -987,11 +987,11 @@ fn factor(state: &mut State) -> ParseResult {
             todo!();
         }
         _ => {
-            return reg.failure(Message::error (
+            return reg.failure(Message::error(
                 MissingExpression,
                 details::MissingExpression!(),
                 state.current_token.start_pos.clone(),
-                state.current_token.end_pos.clone()
+                state.current_token.end_pos.clone(),
             ));
         }
     }
@@ -1005,10 +1005,10 @@ fn bin_op(
     let mut reg = ParseRegister::new();
     let mut left: Node;
     match reg.register(&func(&mut state)) {
-        Success(node) => {
+        Ok(node) => {
             left = node;
         }
-        Failure(_) => {
+        Err(_) => {
             return reg.pack();
         }
     }
@@ -1019,10 +1019,10 @@ fn bin_op(
         advance(state);
         let right: Node;
         match reg.register(&func(&mut state)) {
-            Success(node) => {
+            Ok(node) => {
                 right = node;
             }
-            Failure(_) => {
+            Err(_) => {
                 return reg.pack();
             }
         }
@@ -1036,7 +1036,7 @@ fn term(state: &mut State) -> ParseResult {
     bin_op(
         state,
         &factor,
-        Vec::from([TokenType::Plus, TokenType::Minus]),
+        Vec::from([TokenType::Mul, TokenType::Div]),
     )
 }
 
@@ -1055,10 +1055,10 @@ fn comparison_expression(mut state: &mut State) -> ParseResult {
 
             let node: Node;
             match reg.register(&expression(state)) {
-                Success(nod) => {
+                Ok(nod) => {
                     node = nod;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -1079,10 +1079,10 @@ fn comparison_expression(mut state: &mut State) -> ParseResult {
                     TokenType::GTE,
                 ]),
             )) {
-                Success(nod) => {
+                Ok(nod) => {
                     node = nod;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
@@ -1117,8 +1117,8 @@ fn statements(mut state: &mut State) -> ParseResult {
 
     let statement;
     match reg.register(&expression(&mut state)) {
-        Success(node) => statement = node,
-        Failure(_) => return reg.pack(),
+        Ok(node) => statement = node,
+        Err(_) => return reg.pack(),
     }
     statements.push(statement);
 
@@ -1140,8 +1140,8 @@ fn statements(mut state: &mut State) -> ParseResult {
         }
         let statement;
         match reg.try_register(&expression(&mut state)) {
-            Success(node) => statement = node,
-            Failure(_) => {
+            Ok(node) => statement = node,
+            Err(_) => {
                 reverse(state, reg.to_reverse_count);
                 more_statements = false;
                 continue;
@@ -1167,20 +1167,20 @@ fn scope(state: &mut State) -> ParseResult {
             advance(state);
 
             match reg.register(&statements(state)) {
-                Success(node) => {
+                Ok(node) => {
                     expr = node;
                 }
-                Failure(_) => {
+                Err(_) => {
                     return reg.pack();
                 }
             }
 
             if !state.current_token.is(TokenType::RCParen) {
-                return reg.failure(Message::error (
+                return reg.failure(Message::error(
                     MissingCodeblockClosure,
                     details::MissingCodeblockClosure!(),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone()
+                    state.current_token.end_pos.clone(),
                 ));
             }
 
@@ -1188,34 +1188,44 @@ fn scope(state: &mut State) -> ParseResult {
             advance(state);
         }
         _ => match reg.register(&expression(state)) {
-            Success(node) => {
+            Ok(node) => {
                 expr = node;
             }
-            Failure(_) => {
-                return reg.pack();
-            }
+            Err(error) => match error.message_type {
+                MissingExpression => {
+                    return reg.failure(Message::error(
+                        MissingExpressionOrCodeblockOpening,
+                        details::MissingExpressionOrCodeblockOpening!(),
+                        state.current_token.start_pos.clone(),
+                        state.current_token.end_pos.clone(),
+                    ));
+                }
+                _ => {
+                    return reg.pack();
+                }
+            },
         },
     }
     return reg.success(expr);
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result {
+pub fn parse(tokens: Vec<Token>) -> Result<Node, Message> {
     let mut state = State {
         index: 0,
         tokens: &tokens,
         current_token: &tokens[0],
     };
 
-    let result = statements(&mut state);
-    if let Success(_) = result.result {
+    let result = scope(&mut state);
+    if let Ok(_) = result.result {
         if !state.current_token.is(TokenType::EOF) {
             return result
                 .to_register()
-                .failure(Message::error (
+                .failure(Message::error(
                     UnexpectedEOF,
                     details::UnexpectedEOF!(),
                     state.current_token.start_pos.clone(),
-                    state.current_token.end_pos.clone()
+                    state.current_token.end_pos.clone(),
                 ))
                 .result;
         }

@@ -1,6 +1,3 @@
-pub static DIGITS: &str = "0123456789";
-pub static VALID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-
 #[derive(Debug)]
 pub struct Position {
     pub index: usize,

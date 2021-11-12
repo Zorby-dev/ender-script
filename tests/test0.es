@@ -1,3 +1,1 @@
-function fun(a: a, b: number) {
-
-}
+5 + 5
