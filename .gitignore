@@ -1,2 +1,8 @@
 /target
 Cargo.lock
+/crates/cli/target
+/crates/parser/target
+/crates/compiler/target
+/crates/cli/Cargo.lock
+/crates/parser/Cargo.lock
+/crates/compiler/Cargo.lock

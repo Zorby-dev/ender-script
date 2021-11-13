@@ -1,3 +1,0 @@
-static true  : 1b
-static false : 0b
-type   bool  : true | false
