@@ -2,5 +2,6 @@
 members = [
    "./crates/parser",
    "./crates/compiler",
-   "./crates/cli"
+   "./crates/cli",
+   "./crates/utilities"
 ]

@@ -6,3 +6,5 @@ Cargo.lock
 /crates/cli/Cargo.lock
 /crates/parser/Cargo.lock
 /crates/compiler/Cargo.lock
+/crates/utilities/target
+/crates/utilities/Cargo.lock

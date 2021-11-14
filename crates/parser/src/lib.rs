@@ -1,35 +1,46 @@
 mod token;
+mod ast;
+mod parser;
 
 #[cfg(test)]
 mod tests {
-    use super::token::Token;
+    use super::token::{Token, to_i64};
     use logos::Logos;
 
     #[test]
     fn strings() {
         let mut lexer = Token::lexer("\"Hello, World!\"");
 
-        assert_eq!(lexer.next(), Some(Token::String(String::from("\"Hello, World!\""))));
+        assert_eq!(lexer.next(), Some(Token::String));
+        assert_eq!(lexer.slice(), "\"Hello, World!\"");
     }
 
     #[test]
     fn integers() {
         let mut lexer = Token::lexer("45 500_000_000 -1");
 
-        assert_eq!(lexer.next(), Some(Token::Integer(45)));
-        assert_eq!(lexer.next(), Some(Token::Integer(500_000_000)));
-        assert_eq!(lexer.next(), Some(Token::Integer(-1)));
+        assert_eq!(lexer.next(), Some(Token::Integer));
+        assert_eq!(to_i64(&lexer), Some(45));
+        assert_eq!(lexer.next(), Some(Token::Integer));
+        assert_eq!(to_i64(&lexer), Some(500_000_000));
+        assert_eq!(lexer.next(), Some(Token::Integer));
+        assert_eq!(to_i64(&lexer), Some(-1));
     }
 
     #[test]
     fn identifiers() {
         let mut lexer = Token::lexer("x y z abc Class");
 
-        assert_eq!(lexer.next(), Some(Token::Identifier(String::from("x"))));
-        assert_eq!(lexer.next(), Some(Token::Identifier(String::from("y"))));
-        assert_eq!(lexer.next(), Some(Token::Identifier(String::from("z"))));
-        assert_eq!(lexer.next(), Some(Token::Identifier(String::from("abc"))));
-        assert_eq!(lexer.next(), Some(Token::Identifier(String::from("Class"))));
+        assert_eq!(lexer.next(), Some(Token::Identifier));
+        assert_eq!(lexer.slice(), "x");
+        assert_eq!(lexer.next(), Some(Token::Identifier));
+        assert_eq!(lexer.slice(), "y");
+        assert_eq!(lexer.next(), Some(Token::Identifier));
+        assert_eq!(lexer.slice(), "z");
+        assert_eq!(lexer.next(), Some(Token::Identifier));
+        assert_eq!(lexer.slice(), "abc");
+        assert_eq!(lexer.next(), Some(Token::Identifier));
+        assert_eq!(lexer.slice(), "Class");
     }
 
     #[test]

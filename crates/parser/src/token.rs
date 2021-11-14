@@ -4,7 +4,7 @@ fn to_string(lex: &mut Lexer<Token>) -> Option<String> {
     Some(lex.slice().to_string())
 }
 
-fn to_i64(lex: &mut Lexer<Token>) -> Option<i64> {
+pub fn to_i64(lex: &Lexer<Token>) -> Option<i64> {
     lex.slice().to_string().replace("_", "").parse::<i64>().ok()
 }
 
@@ -70,15 +70,16 @@ pub enum Token {
     #[token("not")]
     Not,
 
-    #[regex(r##"[a-zA-Z][a-zA-Z0-9]*"##, to_string)]
-    Identifier(String),
-    #[regex(r##""(?:\\"|[^"])*""##, to_string)]
-    String(String),
-    #[regex(r##"-?\d+(?:_\d+)*"##, to_i64)]
-    Integer(i64),
+    #[regex(r##"[a-zA-Z][a-zA-Z0-9]*"##)]
+    Identifier,
+    #[regex(r##""(?:\\"|[^"])*""##)]
+    String,
+    #[regex(r##"-?\d+(?:_\d+)*"##)]
+    Integer,
 
     #[error]
     Error,
     #[regex(r"[ \t\f]+", logos::skip)]
-    Whitespace
+    Whitespace,
+    EoF
 }
