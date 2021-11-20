@@ -41,8 +41,8 @@ impl Cursor {
         }
     }
 
-    pub fn update(&mut self, slice: (usize, usize)) {
-        self.start.update(slice.0, self.text.clone());
-        self.end.update(slice.1, self.text.clone());
+    pub fn update(&mut self, span: std::ops::Range<usize>) {
+        self.start.update(span.start, self.text.clone());
+        self.end.update(span.end, self.text.clone());
     }
 }

@@ -41,7 +41,12 @@ pub mod details {
         ($member_type: tt) => (format!("Expected {} name", $member_type).as_str());
     }
 
-    pub use { IllegalCharacter, MissingCharacter, MissingMemberDeclaration, MissingMemberTypeOrValueAssignment, MissingMemberType, MissingMemberName, MissingExpression };
+    #[macro_export]
+    macro_rules! MissingCaseOpening {
+        ($case_type: tt) => (format!("Expected '(' to open {}", $case_type).as_str());
+    }
+
+    pub use { IllegalCharacter, MissingCharacter, MissingMemberDeclaration, MissingMemberTypeOrValueAssignment, MissingMemberType, MissingMemberName, MissingExpression, MissingCaseOpening };
 }
 
 #[derive(Clone)]
@@ -54,6 +59,8 @@ pub enum MessageType {
     MissingMemberName,
     MissingMemberType,
     MissingMemberTypeOrValueAssignment,
+    MissingCaseOpening,
+    MissingCaseClosure
 }
 impl MessageType {
     pub fn parameters(&self) -> (bool, &'static str, &'static str) {
@@ -77,6 +84,8 @@ impl MessageType {
             MessageType::MissingMemberName                   => (true, "ES102E", "Missing member name"),
             MessageType::MissingMemberType                   => (true, "ES103E", "Missing member type"),
             MessageType::MissingMemberTypeOrValueAssignment  => (true, "ES104E", "Missing member type or value assignment"),
+            MessageType::MissingCaseOpening                  => (true, "ES104E", "Missing case opening"),
+            MessageType::MissingCaseClosure                  => (true, "ES104E", "Missing case closure"),
         }
     }
 

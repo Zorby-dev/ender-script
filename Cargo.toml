@@ -1,7 +1,7 @@
 [workspace]
 members = [
-   "./crates/parser",
-   "./crates/compiler",
-   "./crates/cli",
-   "./crates/utilities"
+   "crates/parser",
+   "crates/compiler",
+   "crates/cli",
+   "crates/utilities"
 ]

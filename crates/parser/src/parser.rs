@@ -1,13 +1,14 @@
 use logos::Lexer;
 use utilities::{cursor::Cursor, message::{Message, MessageType::*, details}};
 
-use crate::{ast::Expression, token::Token};
+use crate::{ast::{Expression, Parameter}, token::Token};
 
 struct Parser<'a> {
     lexer: Lexer<'a, Token>,
     current: Token,
     peek: Token,
-    cursor: Cursor
+    cursor: Cursor,
+    peek_cursor: Cursor
 }
 impl<'a> Parser<'a> {
     fn new(lexer: Lexer<'a, Token>, file_name: &str, text: &str) -> Self {
@@ -15,7 +16,8 @@ impl<'a> Parser<'a> {
             lexer,
             current: Token::EoF,
             peek: Token::EoF,
-            cursor: Cursor::new(file_name, text)
+            cursor: Cursor::new(file_name, text),
+            peek_cursor: Cursor::new(file_name, text)
         }
     }
 
@@ -26,7 +28,9 @@ impl<'a> Parser<'a> {
 
     fn advance(&mut self) {
         self.current = self.peek.clone();
+        self.cursor = self.peek_cursor.clone();
         self.peek = if let Some(token) = self.lexer.next() { token.clone() } else { Token::EoF };
+        self.peek_cursor.update(self.lexer.span());
     }
 
     fn next(&self) -> Result<Option<Expression>, Message> {
@@ -49,8 +53,42 @@ impl<'a> Parser<'a> {
         let name = self.expect_identifier_and_advance(Message::error(
             MissingMemberName,
             details::MissingMemberName!("function"),
-            
+            self.cursor.clone()
+        ))?;
+        self.expect_and_advance(Token::LeftParen, Message::error(
+            MissingCaseOpening,
+            details::MissingCaseOpening!("parameter declaration"),
+            self.cursor.clone()
         ));
+        let mut parameters: Vec<Parameter> = Vec::new();
+        while let Some(identifier) = self.suspect_identifier_and_advance() {
+            
+        }
+    }
+
+    fn suspect(&self, token: Token) -> Option<&Token> {
+        if self.current == token {
+            Some(&self.current)
+        } else {
+            None
+        }
+    }
+
+    fn suspect_identifier(&self) -> Option<String> {
+        self.suspect(Token::Identifier)?;
+        Some(self.lexer.slice().to_string())
+    }
+
+    fn suspect_and_advance(&mut self, token: Token) -> Option<&Token> {
+        let out = self.suspect(token);
+        self.advance();
+        out
+    }
+
+    fn suspect_identifier_and_advance(&mut self) -> Option<String> {
+        let out = self.suspect_identifier();
+        self.advance();
+        out
     }
 
     fn expect(&self, token: Token, error: Message) -> Result<&Token, Message> {
