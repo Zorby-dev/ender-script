@@ -46,7 +46,12 @@ pub mod details {
         ($case_type: tt) => (format!("Expected '(' to open {}", $case_type).as_str());
     }
 
-    pub use { IllegalCharacter, MissingCharacter, MissingMemberDeclaration, MissingMemberTypeOrValueAssignment, MissingMemberType, MissingMemberName, MissingExpression, MissingCaseOpening };
+    #[macro_export]
+    macro_rules! MissingSeparatorOrCaseClosure {
+        () => ("Expected ',' or ')'");
+    }
+
+    pub use { IllegalCharacter, MissingCharacter, MissingMemberDeclaration, MissingMemberTypeOrValueAssignment, MissingMemberType, MissingMemberName, MissingExpression, MissingCaseOpening, MissingSeparatorOrCaseClosure };
 }
 
 #[derive(Clone)]
@@ -60,7 +65,8 @@ pub enum MessageType {
     MissingMemberType,
     MissingMemberTypeOrValueAssignment,
     MissingCaseOpening,
-    MissingCaseClosure
+    MissingCaseClosure,
+    MissingSeparatorOrCaseClosure
 }
 impl MessageType {
     pub fn parameters(&self) -> (bool, &'static str, &'static str) {
@@ -73,8 +79,10 @@ impl MessageType {
                | #---- message code (00 to 99)
                |
                #------ message process:
-                        - Lexer  = 0
-                        - Parser = 1
+                        - Lexer    = 0
+                        - Parser   = 1
+                        - Compiler = 2
+                        - Builder  = 3
             */
             MessageType::IllegalCharacter                    => (true, "ES000E", "Illegal character"),
             MessageType::MissingCharacter                    => (true, "ES001E", "Missing character"),
@@ -84,8 +92,9 @@ impl MessageType {
             MessageType::MissingMemberName                   => (true, "ES102E", "Missing member name"),
             MessageType::MissingMemberType                   => (true, "ES103E", "Missing member type"),
             MessageType::MissingMemberTypeOrValueAssignment  => (true, "ES104E", "Missing member type or value assignment"),
-            MessageType::MissingCaseOpening                  => (true, "ES104E", "Missing case opening"),
-            MessageType::MissingCaseClosure                  => (true, "ES104E", "Missing case closure"),
+            MessageType::MissingCaseOpening                  => (true, "ES105E", "Missing case opening"),
+            MessageType::MissingCaseClosure                  => (true, "ES106E", "Missing case closure"),
+            MessageType::MissingSeparatorOrCaseClosure       => (true, "ES107E", "Missing separator or case closure"),
         }
     }
 

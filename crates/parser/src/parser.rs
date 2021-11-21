@@ -1,7 +1,9 @@
-use logos::Lexer;
+use std::clone;
+
+use logos::{Lexer, internal::LexerInternal};
 use utilities::{cursor::Cursor, message::{Message, MessageType::*, details}};
 
-use crate::{ast::{Expression, Parameter}, token::Token};
+use crate::{ast::{Expression, Parameter, Type}, token::Token};
 
 struct Parser<'a> {
     lexer: Lexer<'a, Token>,
@@ -59,11 +61,44 @@ impl<'a> Parser<'a> {
             MissingCaseOpening,
             details::MissingCaseOpening!("parameter declaration"),
             self.cursor.clone()
-        ));
+        ))?;
         let mut parameters: Vec<Parameter> = Vec::new();
         while let Some(identifier) = self.suspect_identifier_and_advance() {
-            
+            self.expect_and_advance(Token::Colon, Message::error(
+                MissingMemberType,
+                details::MissingMemberType!("parameter"),
+                self.cursor.clone()
+            ))?;
+            let typ = self.expect_identifier_and_advance(Message::error(
+                MissingMemberType,
+                details::MissingMemberType!("parameter"),
+                self.cursor.clone()
+            ))?;
+            parameters.push(Parameter {
+                name: identifier,
+                type_: Type { name: typ }
+            });
+            match self.current {
+                Token::LeftParen => break,
+                Token::Comma => continue,
+                _ => return Err(Message::error(
+                    MissingSeparatorOrCaseClosure,
+                    details::MissingSeparatorOrCaseClosure!(),
+                    self.cursor.clone()
+                ))
+            }
         }
+        self.expect_and_advance(Token::Colon, Message::error(
+            MissingMemberType,
+            details::MissingMemberType!("return"),
+            self.cursor.clone()
+        ))?;
+        let typ = self.expect_identifier_and_advance(Message::error(
+            MissingMemberType,
+            details::MissingMemberType!("return"),
+            self.cursor.clone()
+        ))?;
+
     }
 
     fn suspect(&self, token: Token) -> Option<&Token> {
