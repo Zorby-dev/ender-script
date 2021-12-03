@@ -1,11 +1,7 @@
-use logos::{Lexer, Logos};
+use logos::Logos;
 
-fn to_string(lex: &mut Lexer<Token>) -> Option<String> {
-    Some(lex.slice().to_string())
-}
-
-pub fn to_i64(lex: &Lexer<Token>) -> Option<i64> {
-    lex.slice().to_string().replace("_", "").parse::<i64>().ok()
+pub fn to_i64(slice: &impl ToString) -> i64 {
+    slice.to_string().replace("_", "").parse::<i64>().unwrap()
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
@@ -55,6 +51,8 @@ pub enum Token {
 
     #[token("function")]
     Function,
+    #[token("let")]
+    Let,
     #[token("while")]
     While,
     #[token("if")]
@@ -77,9 +75,11 @@ pub enum Token {
     #[regex(r##"-?\d+(?:_\d+)*"##)]
     Integer,
 
+    #[token("\n")]
+    NewLine,
     #[error]
     Error,
     #[regex(r"[ \t\f]+", logos::skip)]
     Whitespace,
-    EoF
+    EoF,
 }

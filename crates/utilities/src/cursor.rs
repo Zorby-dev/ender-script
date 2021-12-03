@@ -1,5 +1,3 @@
-use std::io::BufRead;
-
 #[derive(Debug, Clone)]
 pub struct Position {
     pub index: usize,
@@ -15,12 +13,18 @@ impl Position {
         }
     }
 
-    pub fn update(&mut self, index: usize, text: String) {
+    pub fn update(&mut self, index: usize, text: &str) {
+        // TODO Overhaul this system
         self.index = index;
-        let a = text.chars().take(index).collect::<String>();
-        let lines = a.split("\n").collect::<Vec<&str>>();
-        self.line_num = lines.len();
-        self.col = lines.last().unwrap().len() - 1;
+        let text_to_index: String = text.chars().take(index + 1).collect();
+        let lines_to_index: Vec<&str> = text_to_index.split("\n").collect();
+        self.line_num = lines_to_index.len() - 1;
+        let len = lines_to_index.last().unwrap().len();
+        if len != 0 {
+            self.col = len - 1;
+        } else if lines_to_index.len() > 1 {
+            self.col = lines_to_index.get(lines_to_index.len() - 2).unwrap().len();
+        }
     }
 }
 
@@ -42,7 +46,7 @@ impl Cursor {
     }
 
     pub fn update(&mut self, span: std::ops::Range<usize>) {
-        self.start.update(span.start, self.text.clone());
-        self.end.update(span.end, self.text.clone());
+        self.start.update(span.start, &self.text);
+        self.end.update(span.end, &self.text);
     }
 }

@@ -1,72 +1,161 @@
 use ansi_term::ANSIString;
-use ansi_term::Color::{ self, Fixed, White };
 use ansi_term::ANSIStrings;
+use ansi_term::Color::{self, Fixed, White};
 
-use crate::cursor::Cursor;
 use crate::color::*;
+use crate::cursor::Cursor;
 
 pub mod details {
     #[macro_export]
     macro_rules! IllegalCharacter {
-        ($chr: tt) => (format!("Character '{}' is not allowed", $chr).as_str());
+        ($chr: expr) => {
+            format!("Character '{}' is not allowed", $chr).as_str()
+        };
     }
 
     #[macro_export]
     macro_rules! MissingCharacter {
-        ($chr: tt) => (format!("Character '{}' is missing", $chr).as_str());
+        ($chr: tt) => {
+            format!("Character '{}' is missing", $chr).as_str()
+        };
     }
 
     #[macro_export]
     macro_rules! MissingExpression {
-        () => ("Expected any expression");
+        () => {
+            "Expected any expression"
+        };
     }
 
     #[macro_export]
     macro_rules! MissingMemberDeclaration {
-        ($name: tt, $member_type: tt) => (format!("Expected ':' to declare {} '{}'", $name, $member_type).as_str());
+        ($name: tt, $member_type: tt) => {
+            format!("Expected ':' to declare {} '{}'", $name, $member_type).as_str()
+        };
     }
 
     #[macro_export]
     macro_rules! MissingMemberTypeOrValueAssignment {
-        ($name: tt, $member_type: tt) => (format!("Expected {} type or '=' to assign '{}' a value", $member_type, $name).as_str());
+        ($member_type: tt) => {
+            format!(
+                "Expected ':' to declare {} type or '=' to assign a value",
+                $member_type
+            )
+            .as_str()
+        };
     }
 
     #[macro_export]
     macro_rules! MissingMemberType {
-        ($member_type: tt) => (format!("Expected {} type", $member_type).as_str());
+        ($member_type: tt) => {
+            format!("Expected {} type", $member_type).as_str()
+        };
+    }
+
+    #[macro_export]
+    macro_rules! MissingMemberTypeColon {
+        ($member_type: tt) => {
+            format!("Expected ':' to declare {} type", $member_type).as_str()
+        };
     }
 
     #[macro_export]
     macro_rules! MissingMemberName {
-        ($member_type: tt) => (format!("Expected {} name", $member_type).as_str());
+        ($member_type: tt) => {
+            format!("Expected {} name", $member_type).as_str()
+        };
     }
 
     #[macro_export]
-    macro_rules! MissingCaseOpening {
-        ($case_type: tt) => (format!("Expected '(' to open {}", $case_type).as_str());
+    macro_rules! MissingCase {
+        ($case_type: tt) => {
+            format!("Expected '(' to open {}", $case_type).as_str()
+        };
     }
 
     #[macro_export]
-    macro_rules! MissingSeparatorOrCaseClosure {
-        () => ("Expected ',' or ')'");
+    macro_rules! MissingBlock {
+        () => {
+            "Expected '{' to open a block"
+        };
     }
 
-    pub use { IllegalCharacter, MissingCharacter, MissingMemberDeclaration, MissingMemberTypeOrValueAssignment, MissingMemberType, MissingMemberName, MissingExpression, MissingCaseOpening, MissingSeparatorOrCaseClosure };
+    #[macro_export]
+    macro_rules! MissingCaseSeparatorOrClosure {
+        () => {
+            "Expected ',' or ')'"
+        };
+    }
+
+    #[macro_export]
+    macro_rules! MissingBlockSeparatorOrClosure {
+        () => {
+            "Expected a new line or '}'"
+        };
+    }
+
+    #[macro_export]
+    macro_rules! UnknownType {
+        ($type_name: expr) => {
+            format!("Type \"{}\" does not exist in this scope", $type_name).as_str()
+        };
+    }
+
+    #[macro_export]
+    macro_rules! IntegerBoundsExceeded {
+        ($byte_limit: tt) => {
+            format!("Provided integer exceeds the {} byte limit", $byte_limit).as_str()
+        };
+    }
+
+    #[macro_export]
+    macro_rules! TypeMismatch {
+        ($expected: tt, $got: tt) => {
+            format!("Expected value of type {}, got {}", $expected, $got).as_str()
+        };
+    }
+
+    #[macro_export]
+    macro_rules! UnknownMember {
+        ($member_type: tt, $member_name: expr) => {
+            format!("{} '{}' is not declared in this scope", $member_type, $member_name).as_str()
+        };
+    }
+
+    #[macro_export]
+    macro_rules! MemberRedeclaration {
+        ($member_type: tt, $member_name: expr) => {
+            format!("{} '{}' had already been declared", $member_type, $member_name).as_str()
+        };
+    }
+
+    pub use {
+        IllegalCharacter, IntegerBoundsExceeded, MissingBlock, MissingBlockSeparatorOrClosure,
+        MissingCase, MissingCaseSeparatorOrClosure, MissingCharacter, MissingExpression,
+        MissingMemberDeclaration, MissingMemberName, MissingMemberType, MissingMemberTypeColon,
+        MissingMemberTypeOrValueAssignment, TypeMismatch, UnknownType, UnknownMember, MemberRedeclaration
+    };
 }
 
 #[derive(Clone)]
 pub enum MessageType {
     IllegalCharacter,
-    MissingCharacter,
-    InvalidEscapeSequence,
     MissingExpression,
     MissingMemberDeclaration,
     MissingMemberName,
     MissingMemberType,
     MissingMemberTypeOrValueAssignment,
-    MissingCaseOpening,
+    MissingCase,
     MissingCaseClosure,
-    MissingSeparatorOrCaseClosure
+    MissingCaseSeparatorOrClosure,
+    MissingBlock,
+    MissingBlockClosure,
+    MissingBlockSeparatorOrClosure,
+    UnknownType,
+    IntegerBoundsExceeded,
+    TypeMismatch,
+    UnknownMember,
+    MemberRedeclaration
 }
 impl MessageType {
     pub fn parameters(&self) -> (bool, &'static str, &'static str) {
@@ -79,22 +168,27 @@ impl MessageType {
                | #---- message code (00 to 99)
                |
                #------ message process:
-                        - Lexer    = 0
-                        - Parser   = 1
-                        - Compiler = 2
-                        - Builder  = 3
+                        - Parser   = 0
+                        - Compiler = 1
+                        - Builder  = 2
             */
             MessageType::IllegalCharacter                    => (true, "ES000E", "Illegal character"),
-            MessageType::MissingCharacter                    => (true, "ES001E", "Missing character"),
-            MessageType::InvalidEscapeSequence               => (true, "ES002E", "Invalid escape sequence"),
-            MessageType::MissingExpression                   => (true, "ES100E", "Missing expression"),
-            MessageType::MissingMemberDeclaration            => (true, "ES101E", "Missing member declaration"),
-            MessageType::MissingMemberName                   => (true, "ES102E", "Missing member name"),
-            MessageType::MissingMemberType                   => (true, "ES103E", "Missing member type"),
-            MessageType::MissingMemberTypeOrValueAssignment  => (true, "ES104E", "Missing member type or value assignment"),
-            MessageType::MissingCaseOpening                  => (true, "ES105E", "Missing case opening"),
-            MessageType::MissingCaseClosure                  => (true, "ES106E", "Missing case closure"),
-            MessageType::MissingSeparatorOrCaseClosure       => (true, "ES107E", "Missing separator or case closure"),
+            MessageType::MissingExpression                   => (true, "ES001E", "Missing expression"),
+            MessageType::MissingMemberDeclaration            => (true, "ES002E", "Missing member declaration"),
+            MessageType::MissingMemberName                   => (true, "ES003E", "Missing member name"),
+            MessageType::MissingMemberType                   => (true, "ES004E", "Missing member type"),
+            MessageType::MissingMemberTypeOrValueAssignment  => (true, "ES005E", "Missing member type or value assignment"),
+            MessageType::MissingCase                         => (true, "ES006E", "Missing case"),
+            MessageType::MissingCaseClosure                  => (true, "ES007E", "Missing case closure"),
+            MessageType::MissingCaseSeparatorOrClosure       => (true, "ES008E", "Missing case separator or closure"),
+            MessageType::MissingBlock                        => (true, "ES009E", "Missing block"),
+            MessageType::MissingBlockClosure                 => (true, "ES010E", "Missing block closure"),
+            MessageType::MissingBlockSeparatorOrClosure      => (true, "ES011E", "Missing block separator or closure"),
+            MessageType::UnknownType                         => (true, "ES100E", "Unknown type"),
+            MessageType::IntegerBoundsExceeded               => (true, "ES101E", "Integer bounds exceeded"),
+            MessageType::TypeMismatch                        => (true, "ES102E", "Type mismatch"),
+            MessageType::UnknownMember                       => (true, "ES103E", "Unknown member"),
+            MessageType::MemberRedeclaration                 => (true, "ES104E", "Member redeclaration")
         }
     }
 
@@ -115,7 +209,7 @@ impl MessageType {
 pub struct Message {
     pub message_type: MessageType,
     pub details: String,
-    pub cursor: Cursor
+    pub cursor: Cursor,
 }
 
 impl Message {
@@ -135,7 +229,11 @@ impl Message {
 
     fn header(&self) -> String {
         if self.message_type.is_error() {
-            return self.color().bold().paint(format!("Error {}: ", self.message_type.code())).to_string();
+            return self
+                .color()
+                .bold()
+                .paint(format!("Error {}: ", self.message_type.code()))
+                .to_string();
         }
         panic!();
     }
@@ -143,14 +241,23 @@ impl Message {
     fn file_name(&self) -> String {
         let strings: &[ANSIString<'static>] = &[
             Grey!().paint("["),
-            White.paint(format!("{}:{}:{}", self.cursor.file_name, self.cursor.start.line_num, self.cursor.start.col)),
+            White.paint(format!(
+                "{}:{}:{}",
+                self.cursor.file_name, self.cursor.start.line_num, self.cursor.start.col
+            )),
             Grey!().paint("]"),
         ];
         return ANSIStrings(strings).to_string();
     }
 
     fn line(&self) -> String {
-        let line = self.cursor.text.split('\n').nth(self.cursor.start.line_num).unwrap().to_string();
+        let line = self
+            .cursor
+            .text
+            .split('\n')
+            .nth(self.cursor.start.line_num)
+            .unwrap()
+            .to_string();
         let first = line[..self.cursor.start.col].to_string();
         let err = line[self.cursor.start.col..self.cursor.end.col].to_string();
         let last = line[self.cursor.end.col..].to_string();
@@ -174,16 +281,16 @@ impl Message {
             underline += "─";
         }
         underline += "┬";
-        for _ in middle+1..error_len {
+        for _ in middle + 1..error_len {
             underline += "─";
         }
         result.push(self.light_color().paint(underline).to_string());
         let mut error_line = String::new();
-        for _ in 0..self.cursor.start.col+middle {
+        for _ in 0..self.cursor.start.col + middle {
             error_line += " ";
         }
         error_line += "╰─";
-        for _ in 0..error_len-middle {
+        for _ in 0..error_len - middle {
             error_line += "─";
         }
         error_line += " ";
@@ -195,7 +302,7 @@ impl Message {
         let line_num = self.cursor.start.line_num.to_string();
         let padding_width = line_num.len() + 2;
         let mut output = String::new();
-        
+
         let mut padding = String::new();
         for _ in 0..padding_width {
             padding += " ";
@@ -222,18 +329,16 @@ impl Message {
         return output;
     }
 
-    pub fn to_string(&self) -> String {
-          self.header()
-        + self.message_type.name()
-        + "\n"
-        + &self.body()
-    }
-
     pub fn error(message_type: MessageType, details: &str, cursor: Cursor) -> Self {
         return Self {
             details: details.to_string(),
             message_type,
-            cursor
-        }
+            cursor,
+        };
+    }
+}
+impl ToString for Message {
+    fn to_string(&self) -> String {
+        self.header() + self.message_type.name() + "\n" + &self.body()
     }
 }

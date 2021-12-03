@@ -1,15 +1,17 @@
+use utilities::cursor::Cursor;
+
 pub type Identifier = String;
 pub type Codeblock = Vec<Expression>;
 
 #[derive(Debug)]
 pub struct Type {
-    name: Identifier
+    pub name: Identifier
 }
 
 #[derive(Debug)]
 pub struct Parameter {
-    name: Identifier,
-    type_: Type,
+    pub name: Identifier,
+    pub type_: Type,
 }
 
 #[derive(Debug)]
@@ -22,19 +24,22 @@ pub enum Expression {
     FunctionDeclaration {
         name: Identifier,
         parameters: Vec<Parameter>,
-        return_type: Option<Type>,
-        body: Codeblock
+        return_type: Type,
+        body: Codeblock,
+        cursor: Cursor
     },
     FunctionCall {
         name: Identifier,
-        arguments: Vec<Argument>
+        arguments: Vec<Argument>,
+        cursor: Cursor
     },
     VariableDeclaration {
         name: Identifier,
-        type_: Option<Type>,
-        value: Option<Box<Expression>>
+        variable_type: Option<Type>,
+        value: Option<Box<Expression>>,
+        cursor: Cursor
     },
-    String(String),
-    Integer(i64),
-    VariableAccess(Identifier)
+    String(String, Cursor),
+    Integer(i64, Cursor),
+    VariableAccess(Identifier, Cursor)
 }

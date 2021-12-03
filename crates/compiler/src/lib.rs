@@ -1,3 +1,6 @@
+mod environment;
+pub mod compiler;
+
 #[cfg(test)]
 mod tests {
     #[test]
