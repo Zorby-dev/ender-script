@@ -53,6 +53,8 @@ pub enum Token {
     Function,
     #[token("let")]
     Let,
+    #[token("raw")]
+    Raw,
     #[token("while")]
     While,
     #[token("if")]

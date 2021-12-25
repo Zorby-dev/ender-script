@@ -1,1 +1,0 @@
-scoreboard players operation a a = b b

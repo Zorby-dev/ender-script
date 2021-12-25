@@ -22,11 +22,12 @@ impl ToString for McFunction {
     }
 }
 
+#[derive(Clone, PartialEq)]
 pub enum Value {
     Int(i32),
-    IntPointer { scoreboard: String, player: String },
-    UndefinedPointer { scoreboard: String, player: String },
-    FunctionPointer(String),
+    IntReference { scoreboard: String, player: String },
+    UndefinedReference { scoreboard: String, player: String },
+    FunctionReference(String),
 }
 
 pub struct Scope<'a> {
@@ -40,4 +41,9 @@ impl<'a> Scope<'a> {
             symbol_table: HashSet::new()
         }
     }
+}
+
+#[derive(Clone)]
+pub struct Context {
+    pub macro_target: Option<Value>
 }

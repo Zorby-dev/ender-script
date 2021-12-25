@@ -19,6 +19,8 @@ struct Parser<'a> {
     peek_slice: String,
 }
 impl<'a> Parser<'a> {
+    // MISC
+
     fn new(lexer: Lexer<'a, Token>, file_name: &str, text: &str) -> Self {
         Self {
             lexer,
@@ -49,10 +51,58 @@ impl<'a> Parser<'a> {
         self.peek_slice = self.lexer.slice().to_string();
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, Message> {
+    fn suspect(&self, token: Token) -> Option<Token> {
+        if self.current == token {
+            Some(self.current.clone())
+        } else {
+            None
+        }
+    }
+
+    fn suspect_identifier(&self) -> Option<String> {
+        self.suspect(Token::Identifier)?;
+        Some(self.slice.to_string())
+    }
+
+    /*fn suspect_and_advance(&mut self, token: Token) -> Option<Token> {
+        let out = self.suspect(token)?;
+        self.advance();
+        Some(out)
+    }*/
+
+    fn suspect_identifier_and_advance(&mut self) -> Option<String> {
+        let out = self.suspect_identifier();
+        self.advance();
+        out
+    }
+
+    fn expect(&self, token: Token, error: Message) -> Result<Token, Message> {
+        if self.current == token {
+            Ok(self.current.clone())
+        } else {
+            Err(error)
+        }
+    }
+
+    fn expect_identifier(&self, error: Message) -> Result<String, Message> {
+        self.expect(Token::Identifier, error)?;
+        Ok(self.slice.to_string())
+    }
+
+    fn expect_and_advance(&mut self, token: Token, error: Message) -> Result<Token, Message> {
+        let out = self.expect(token, error);
+        self.advance();
+        out
+    }
+
+    fn expect_identifier_and_advance(&mut self, error: Message) -> Result<String, Message> {
+        let out = self.expect_identifier(error);
+        self.advance();
+        out
+    }
+
+    fn atom(&mut self) -> Result<Expression, Message> {
         match self.current {
-            Token::Function => self.parse_function(),
-            Token::Let => self.parse_let(),
             Token::Integer => Ok(Expression::Integer(
                 token::to_i64(&self.slice),
                 self.cursor.clone(),
@@ -61,16 +111,88 @@ impl<'a> Parser<'a> {
                 self.slice.clone(),
                 self.cursor.clone(),
             )),
-            Token::Error => Err(Message::error(
-                IllegalCharacter,
-                details::IllegalCharacter!(self.slice),
+            Token::LeftParen => {
+                self.advance();
+                let statement = self.statement()?;
+                self.advance();
+                self.expect(
+                    Token::RightParen,
+                    Message::error(
+                        MissingCaseClosure,
+                        details::MissingCaseClosure!(),
+                        self.cursor.clone(),
+                    ),
+                )?;
+                Ok(statement)
+            }
+            _ => Err(Message::error(
+                MissingExpression,
+                details::MissingExpression!(),
                 self.cursor.clone(),
             )),
-            _ => {
-                println!("{:?}", self.current);
-                todo!();
+        }
+    }
+
+    fn math_expr_1(&mut self) -> Result<Expression, Message> {
+        let mut left = self.atom()?;
+
+        while self.peek == Token::Asterisk || self.peek == Token::Slash {
+            self.advance();
+            match self.current {
+                Token::Asterisk => {
+                    self.advance();
+
+                    left = Expression::Multiplication {
+                        left: Box::new(left),
+                        right: Box::new(self.atom()?),
+                        cursor: self.cursor.clone(),
+                    }
+                }
+                Token::Slash => {
+                    self.advance();
+
+                    left = Expression::Division {
+                        left: Box::new(left),
+                        right: Box::new(self.atom()?),
+                        cursor: self.cursor.clone(),
+                    }
+                }
+                _ => unreachable!(),
             }
         }
+
+        Ok(left)
+    }
+
+    fn math_expr_2(&mut self) -> Result<Expression, Message> {
+        let mut left = self.math_expr_1()?;
+
+        while self.peek == Token::Plus || self.peek == Token::Minus {
+            self.advance();
+            match self.current {
+                Token::Plus => {
+                    self.advance();
+
+                    left = Expression::Addition {
+                        left: Box::new(left),
+                        right: Box::new(self.math_expr_1()?),
+                        cursor: self.cursor.clone(),
+                    }
+                }
+                Token::Minus => {
+                    self.advance();
+
+                    left = Expression::Subtraction {
+                        left: Box::new(left),
+                        right: Box::new(self.math_expr_1()?),
+                        cursor: self.cursor.clone(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(left)
     }
 
     fn parse_let(&mut self) -> Result<Expression, Message> {
@@ -109,8 +231,9 @@ impl<'a> Parser<'a> {
 
         let value: Option<Expression>;
 
-        if let Some(_) = self.suspect_and_advance(Token::Assign) {
-            value = Some(self.parse_expression()?);
+        if let Some(_) = self.suspect(Token::Assign) {
+            self.advance();
+            value = Some(self.statement()?);
         } else {
             value = None;
         }
@@ -245,7 +368,7 @@ impl<'a> Parser<'a> {
         let mut body: Vec<Expression> = Vec::new();
 
         loop {
-            body.push(self.parse_expression()?);
+            body.push(self.statement()?);
             self.advance();
             match self.current {
                 Token::RightBrace => break,
@@ -279,60 +402,37 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn suspect(&self, token: Token) -> Option<Token> {
-        if self.current == token {
-            Some(self.current.clone())
-        } else {
-            None
+    fn parse_raw(&mut self) -> Result<Expression, Message> {
+        let start = self.cursor.start.clone();
+
+        self.advance();
+
+        let string = Box::new(self.statement()?);
+
+        Ok(Expression::RawCode {
+            string,
+            cursor: Cursor {
+                start,
+                end: self.cursor.end.clone(),
+                file_name: self.cursor.file_name.clone(),
+                text: self.cursor.text.clone()
+            }
+        })
+    }
+
+    fn statement(&mut self) -> Result<Expression, Message> {
+        match self.current {
+            Token::Let => self.parse_let(),
+            Token::Function => self.parse_function(),
+            Token::Raw => self.parse_raw(),
+            _ => self.math_expr_2(),
         }
-    }
-
-    fn suspect_identifier(&self) -> Option<String> {
-        self.suspect(Token::Identifier)?;
-        Some(self.slice.to_string())
-    }
-
-    fn suspect_and_advance(&mut self, token: Token) -> Option<Token> {
-        let out = self.suspect(token)?;
-        self.advance();
-        Some(out)
-    }
-
-    fn suspect_identifier_and_advance(&mut self) -> Option<String> {
-        let out = self.suspect_identifier();
-        self.advance();
-        out
-    }
-
-    fn expect(&self, token: Token, error: Message) -> Result<Token, Message> {
-        if self.current == token {
-            Ok(self.current.clone())
-        } else {
-            Err(error)
-        }
-    }
-
-    fn expect_identifier(&self, error: Message) -> Result<String, Message> {
-        self.expect(Token::Identifier, error)?;
-        Ok(self.slice.to_string())
-    }
-
-    fn expect_and_advance(&mut self, token: Token, error: Message) -> Result<Token, Message> {
-        let out = self.expect(token, error);
-        self.advance();
-        out
-    }
-
-    fn expect_identifier_and_advance(&mut self, error: Message) -> Result<String, Message> {
-        let out = self.expect_identifier(error);
-        self.advance();
-        out
     }
 
     fn parse(&mut self) -> Result<Vec<Expression>, Message> {
         let mut out: Vec<Expression> = Vec::new();
         while self.current != Token::EoF {
-            out.push(self.parse_expression()?);
+            out.push(self.statement()?);
             self.advance();
             match self.current {
                 Token::EoF => break,

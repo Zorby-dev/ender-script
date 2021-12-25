@@ -74,9 +74,9 @@ pub mod details {
     }
 
     #[macro_export]
-    macro_rules! MissingBlock {
+    macro_rules! MissingCaseClosure {
         () => {
-            "Expected '{' to open a block"
+            "Expected ')'"
         };
     }
 
@@ -84,6 +84,13 @@ pub mod details {
     macro_rules! MissingCaseSeparatorOrClosure {
         () => {
             "Expected ',' or ')'"
+        };
+    }
+
+    #[macro_export]
+    macro_rules! MissingBlock {
+        () => {
+            "Expected '{' to open a block"
         };
     }
 
@@ -118,22 +125,31 @@ pub mod details {
     #[macro_export]
     macro_rules! UnknownMember {
         ($member_type: tt, $member_name: expr) => {
-            format!("{} '{}' is not declared in this scope", $member_type, $member_name).as_str()
+            format!(
+                "{} '{}' is not declared in this scope",
+                $member_type, $member_name
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! MemberRedeclaration {
         ($member_type: tt, $member_name: expr) => {
-            format!("{} '{}' had already been declared", $member_type, $member_name).as_str()
+            format!(
+                "{} '{}' had already been declared",
+                $member_type, $member_name
+            )
+            .as_str()
         };
     }
 
     pub use {
-        IllegalCharacter, IntegerBoundsExceeded, MissingBlock, MissingBlockSeparatorOrClosure,
-        MissingCase, MissingCaseSeparatorOrClosure, MissingCharacter, MissingExpression,
+        IllegalCharacter, IntegerBoundsExceeded, MemberRedeclaration, MissingBlock,
+        MissingBlockSeparatorOrClosure, MissingCase, MissingCaseClosure,
+        MissingCaseSeparatorOrClosure, MissingCharacter, MissingExpression,
         MissingMemberDeclaration, MissingMemberName, MissingMemberType, MissingMemberTypeColon,
-        MissingMemberTypeOrValueAssignment, TypeMismatch, UnknownType, UnknownMember, MemberRedeclaration
+        MissingMemberTypeOrValueAssignment, TypeMismatch, UnknownMember, UnknownType,
     };
 }
 
@@ -155,7 +171,7 @@ pub enum MessageType {
     IntegerBoundsExceeded,
     TypeMismatch,
     UnknownMember,
-    MemberRedeclaration
+    MemberRedeclaration,
 }
 impl MessageType {
     pub fn parameters(&self) -> (bool, &'static str, &'static str) {
