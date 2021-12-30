@@ -1,13 +1,31 @@
+use std::clone;
+
 use logos::{Lexer, Logos};
 use utilities::{
     cursor::Cursor,
-    message::{details, Message, MessageType::*},
+    message::{details, Message, MessageType::*}, MissingExpression,
 };
 
 use crate::{
     ast::{Expression, Parameter, Type},
     token::{self, Token},
 };
+
+fn cursor_to(expr: &Expression) -> &Cursor {
+    match expr {
+        Expression::FunctionDeclaration { name, parameters, return_type, body, cursor } => cursor,
+        Expression::FunctionCall { name, arguments, cursor } => cursor,
+        Expression::VariableDeclaration { name, variable_type, value, cursor } => cursor,
+        Expression::RawCode { string, cursor } => cursor,
+        Expression::Addition { left, right, cursor } => cursor,
+        Expression::Subtraction { left, right, cursor } => cursor,
+        Expression::Multiplication { left, right, cursor } => cursor,
+        Expression::Division { left, right, cursor } => cursor,
+        Expression::String(_, cursor) => cursor,
+        Expression::Integer(_, cursor) => cursor,
+        Expression::VariableAccess(_, cursor) => cursor,
+    }
+}
 
 struct Parser<'a> {
     lexer: Lexer<'a, Token>,
@@ -51,34 +69,59 @@ impl<'a> Parser<'a> {
         self.peek_slice = self.lexer.slice().to_string();
     }
 
-    fn suspect(&self, token: Token) -> Option<Token> {
+    fn suspect(&self, token: Token) -> Result<Option<Token>, Message> {
         if self.current == token {
-            Some(self.current.clone())
+           Ok(Some(self.current.clone()))
+        } else if self.current == Token::Error {
+            Err(Message::error(
+                IllegalCharacter,
+                details::IllegalCharacter!(&self.slice),
+                self.cursor.clone()
+            ))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn suspect_identifier(&self) -> Option<String> {
-        self.suspect(Token::Identifier)?;
-        Some(self.slice.to_string())
+    fn suspect_identifier(&self) -> Result<Option<String>, Message> {
+        let ident = self.suspect(Token::Identifier)?;
+        if let None = ident {
+            return Ok(None)
+        }
+        Ok(Some(self.slice.to_string()))
     }
 
-    /*fn suspect_and_advance(&mut self, token: Token) -> Option<Token> {
+    fn suspect_and_advance(&mut self, token: Token) -> Result<Option<Token>, Message> {
         let out = self.suspect(token)?;
-        self.advance();
-        Some(out)
-    }*/
+        match out {
+            Some(out) => {
+                self.advance();
+                Ok(Some(out))
+            },
+            None => Ok(None)
+        }
+    }
 
-    fn suspect_identifier_and_advance(&mut self) -> Option<String> {
-        let out = self.suspect_identifier();
-        self.advance();
-        out
+    fn suspect_identifier_and_advance(&mut self) -> Result<Option<String>, Message> {
+        let out = self.suspect_identifier()?;
+        match out {
+            Some(out) => {
+                self.advance();
+                Ok(Some(out))
+            },
+            None => Ok(None)
+        }
     }
 
     fn expect(&self, token: Token, error: Message) -> Result<Token, Message> {
         if self.current == token {
             Ok(self.current.clone())
+        } else if self.current == Token::Error {
+            Err(Message::error(
+                IllegalCharacter,
+                details::IllegalCharacter!(&self.slice),
+                self.cursor.clone()
+            ))
         } else {
             Err(error)
         }
@@ -107,6 +150,10 @@ impl<'a> Parser<'a> {
                 token::to_i64(&self.slice),
                 self.cursor.clone(),
             )),
+            Token::String => Ok(Expression::String(
+                token::to_string(&self.slice),
+                self.cursor.clone()
+            )),
             Token::Identifier => Ok(Expression::VariableAccess(
                 self.slice.clone(),
                 self.cursor.clone(),
@@ -124,7 +171,12 @@ impl<'a> Parser<'a> {
                     ),
                 )?;
                 Ok(statement)
-            }
+            },
+            Token::Error => Err(Message::error(
+                IllegalCharacter,
+                details::IllegalCharacter!(&self.slice),
+                self.cursor.clone()
+            )),
             _ => Err(Message::error(
                 MissingExpression,
                 details::MissingExpression!(),
@@ -222,7 +274,7 @@ impl<'a> Parser<'a> {
             Token::Assign => variable_type = None,
             _ => {
                 return Err(Message::error(
-                    MissingMemberType,
+                    MissingMemberTypeOrValueAssignment,
                     details::MissingMemberTypeOrValueAssignment!("variable"),
                     self.cursor.clone(),
                 ))
@@ -231,7 +283,7 @@ impl<'a> Parser<'a> {
 
         let value: Option<Expression>;
 
-        if let Some(_) = self.suspect(Token::Assign) {
+        if let Some(_) = self.suspect(Token::Assign)? {
             self.advance();
             value = Some(self.statement()?);
         } else {
@@ -262,11 +314,7 @@ impl<'a> Parser<'a> {
 
         // function name
 
-        let name = self.expect_identifier_and_advance(Message::error(
-            MissingMemberName,
-            details::MissingMemberName!("function"),
-            self.cursor.clone(),
-        ))?;
+        let name = self.suspect_identifier_and_advance()?;
 
         // parameters
 
@@ -284,7 +332,7 @@ impl<'a> Parser<'a> {
         // SECTION - TODO: convert to loop & match
         // LINK crates/parser/src/parser.rs:142
         // !SECTION - TODO: convert to loop & match
-        while let Some(identifier) = self.suspect_identifier_and_advance() {
+        while let Some(identifier) = self.suspect_identifier_and_advance()? {
             self.expect_and_advance(
                 Token::Colon,
                 Message::error(
@@ -326,21 +374,21 @@ impl<'a> Parser<'a> {
 
         // return type
 
-        self.expect_and_advance(
-            Token::Colon,
-            Message::error(
-                MissingMemberType,
-                details::MissingMemberTypeColon!("return"),
-                self.cursor.clone(),
-            ),
+        let colon = self.suspect(
+            Token::Colon
         )?;
 
-        let return_type = Type {
-            name: self.expect_identifier_and_advance(Message::error(
-                MissingMemberType,
-                details::MissingMemberType!("return"),
-                self.cursor.clone(),
-            ))?,
+        let return_type = match colon {
+            Some(_) => Some(
+                Type {
+                    name: self.expect_identifier_and_advance(Message::error(
+                        MissingMemberType,
+                        details::MissingMemberType!("return"),
+                        self.cursor.clone(),
+                    ))?
+                }
+            ),
+            None => None
         };
 
         // block
@@ -407,17 +455,24 @@ impl<'a> Parser<'a> {
 
         self.advance();
 
-        let string = Box::new(self.statement()?);
-
-        Ok(Expression::RawCode {
-            string,
-            cursor: Cursor {
-                start,
-                end: self.cursor.end.clone(),
-                file_name: self.cursor.file_name.clone(),
-                text: self.cursor.text.clone()
-            }
-        })
+        let string = self.statement()?;
+        if let Expression::String(string, _) = string {
+            Ok(Expression::RawCode {
+                string,
+                cursor: Cursor {
+                    start,
+                    end: self.cursor.end.clone(),
+                    file_name: self.cursor.file_name.clone(),
+                    text: self.cursor.text.clone()
+                }
+            })
+        } else {
+            Err(Message::error(
+                MissingExpression,
+                MissingExpression!(),
+                cursor_to(&string).clone()
+            ))
+        }
     }
 
     fn statement(&mut self) -> Result<Expression, Message> {

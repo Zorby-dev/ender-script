@@ -6,6 +6,7 @@ pub mod parser;
 mod tests {
     use super::token::Token;
     use logos::Logos;
+    use super::token;
 
     #[test]
     fn strings() {
@@ -28,6 +29,15 @@ mod tests {
     }*/
 
     #[test]
+    fn to_string() {
+        let mut lexer = Token::lexer(r##" "hey!" "##);
+
+        lexer.next();
+        
+        assert_eq!(token::to_string(&lexer.slice()), "hey!");
+    }
+
+    #[test]
     fn identifiers() {
         let mut lexer = Token::lexer("x y z abc Class");
 
@@ -43,7 +53,7 @@ mod tests {
         assert_eq!(lexer.slice(), "Class");
     }
 
-    #[test]
+    /*#[test]
     fn keywords() {
         let mut lexer = Token::lexer("function while if else or not and");
 
@@ -79,5 +89,5 @@ mod tests {
         assert_eq!(lexer.next(), Some(Token::RightBrace));
         assert_eq!(lexer.next(), Some(Token::Colon));
         assert_eq!(lexer.next(), Some(Token::Comma));
-    }
+    }*/
 }

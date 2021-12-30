@@ -26,19 +26,22 @@ impl ToString for McFunction {
 pub enum Value {
     Int(i32),
     IntReference { scoreboard: String, player: String },
+    Undefined,
     UndefinedReference { scoreboard: String, player: String },
     FunctionReference(String),
 }
 
 pub struct Scope<'a> {
     pub function: &'a mut McFunction,
-    pub symbol_table: HashSet<String>
+    pub symbol_table: HashSet<String>,
+    pub parent: Option<&'a Scope<'a>>
 }
 impl<'a> Scope<'a> {
-    pub fn new(function: &'a mut McFunction) -> Self {
+    pub fn new(function: &'a mut McFunction, parent: Option<&'a Scope<'a>>) -> Self {
         Self {
             function,
-            symbol_table: HashSet::new()
+            symbol_table: HashSet::new(),
+            parent
         }
     }
 }

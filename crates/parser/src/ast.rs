@@ -22,9 +22,9 @@ pub struct Argument {
 #[derive(Debug)]
 pub enum Expression {
     FunctionDeclaration {
-        name: Identifier,
+        name: Option<Identifier>,
         parameters: Vec<Parameter>,
-        return_type: Type,
+        return_type: Option<Type>,
         body: Codeblock,
         cursor: Cursor,
     },
@@ -40,7 +40,7 @@ pub enum Expression {
         cursor: Cursor,
     },
     RawCode {
-        string: Box<Expression>,
+        string: String,
         cursor: Cursor
     },
     Addition {

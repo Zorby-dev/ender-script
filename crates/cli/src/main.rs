@@ -3,7 +3,7 @@ use parser::parser;
 use std::fs;
 
 fn main() {
-    let filename = "C:\\Users\\Jachym\\Documents\\Code\\Rust\\ender-script\\examples\\variables\\main.es";
+    let filename = "./examples/variables/main.es";
 
     let text = fs::read_to_string(filename)
         .expect("Something went wrong reading the file");
@@ -20,8 +20,9 @@ fn main() {
     };
     let out = match compiler::compile(ast) {
         Ok(out) => {
-            println!("{}", out);
-            out
+            for fun in out {
+                println!("{}\n", fun)
+            }
         }
         Err(error) => {
             println!("{}", error.to_string());

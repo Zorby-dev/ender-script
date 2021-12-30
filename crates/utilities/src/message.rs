@@ -1,6 +1,7 @@
 use ansi_term::ANSIString;
 use ansi_term::ANSIStrings;
 use ansi_term::Color::{self, Fixed, White};
+use std::cmp::{max, min};
 
 use crate::color::*;
 use crate::cursor::Cursor;
@@ -274,9 +275,19 @@ impl Message {
             .nth(self.cursor.start.line_num)
             .unwrap()
             .to_string();
-        let first = line[..self.cursor.start.col].to_string();
-        let err = line[self.cursor.start.col..self.cursor.end.col].to_string();
-        let last = line[self.cursor.end.col..].to_string();
+        let first: String = line
+                            .chars()
+                            .take(self.cursor.start.col)
+                            .collect();
+        let err: String = line
+                          .chars()
+                          .skip(self.cursor.start.col)
+                          .take(self.cursor.end.col - self.cursor.start.col)
+                          .collect();
+        let last: String = line
+                           .chars()
+                           .skip(self.cursor.end.col)
+                           .collect();
         let strings: &[ANSIString<'static>] = &[
             Grey!().paint(first),
             self.light_color().bold().paint(err),

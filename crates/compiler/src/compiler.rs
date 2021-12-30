@@ -53,7 +53,7 @@ impl Compiler {
     }
 
     fn compile_variable_declaration(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -178,7 +178,7 @@ impl Compiler {
     }
 
     fn compile_math_operation(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -280,7 +280,7 @@ impl Compiler {
     }
 
     fn compile_addition(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -291,7 +291,7 @@ impl Compiler {
     }
 
     fn compile_subtraction(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -302,7 +302,7 @@ impl Compiler {
     }
 
     fn compile_multiplication(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -313,7 +313,7 @@ impl Compiler {
     }
 
     fn compile_division(
-        &self,
+        &mut self,
         cursor: Cursor,
         scope: &mut Scope,
         context: &Context,
@@ -325,13 +325,26 @@ impl Compiler {
 
     fn compile_function_declaration(
         &mut self,
+        cursor: Cursor,
+        parent: Option<&Scope>,
         context: &Context,
-        name: String,
+        name: Option<String>,
         body: Vec<Expression>,
     ) -> Result<Value, Message> {
+        let name = match name {
+            Some(name) => name,
+            None => match parent {
+                Some(parent) => parent.function.name.clone(),
+                None => return Err(Message::error(
+                    MissingMemberName,
+                    details::MissingMemberName!("function"),
+                    cursor
+                ))
+            }
+        };
         let mut function = McFunction::new(name.clone());
         function.push_cmd(format!("scoreboard objectives add {} dummy", name));
-        let mut scope = Scope::new(&mut function);
+        let mut scope = Scope::new(&mut function, parent);
 
         for expression in body {
             self.compile_expression(&mut scope, context, expression)?;
@@ -344,7 +357,7 @@ impl Compiler {
     }
 
     fn compile_expression(
-        &self,
+        &mut self,
         scope: &mut Scope,
         context: &Context,
         expression: Expression,
@@ -356,6 +369,13 @@ impl Compiler {
                 value,
                 cursor,
             } => self.compile_variable_declaration(cursor, scope, context, name, variable_type, value),
+            Expression::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body,
+                cursor
+            } => self.compile_function_declaration(cursor, Some(scope), context, name, body),
             Expression::Integer(int, cursor) => self.compile_integer(cursor, int),
             Expression::VariableAccess(identifier, cursor) => {
                 self.compile_variable_access(cursor, scope, identifier)
@@ -380,13 +400,20 @@ impl Compiler {
                 right,
                 cursor,
             } => self.compile_division(cursor, scope, context, *left, *right),
-            _ => unimplemented!(),
+            Expression::RawCode {
+                string,
+                cursor
+            } => {
+                scope.function.push_cmd(string);
+                return Ok(Value::Undefined);
+            },
+            _ => unimplemented!()
         }
     }
 }
 
-pub fn compile(ast: Vec<Expression>) -> Result<String, Message> {
+pub fn compile(ast: Vec<Expression>) -> Result<Vec<String>, Message> {
     let mut compiler = Compiler::new();
-    compiler.compile_function_declaration(&Context { macro_target: None }, "main".to_string(), ast)?;
-    Ok(compiler.functions.last().unwrap().to_string())
+    compiler.compile_function_declaration(Cursor::new("", ""), None, &Context { macro_target: None }, Some("main".to_string()), ast)?;
+    Ok(compiler.functions.iter().map(|fun| fun.to_string()).collect())
 }
