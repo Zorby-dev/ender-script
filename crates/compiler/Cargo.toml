@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 parser = { path = "../parser" }
 utilities = { path = "../utilities" }
+ansi_term = "0.12"

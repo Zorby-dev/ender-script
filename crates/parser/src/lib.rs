@@ -1,19 +1,25 @@
-mod token;
 pub mod ast;
 pub mod parser;
+mod token;
 
 #[cfg(test)]
 mod tests {
+    use super::token;
     use super::token::Token;
     use logos::Logos;
-    use super::token;
 
     #[test]
     fn strings() {
         let mut lexer = Token::lexer("\"Hello, World!\"");
 
-        assert_eq!(lexer.next(), Some(Token::String));
-        assert_eq!(lexer.slice(), "\"Hello, World!\"");
+        assert_eq!(
+            lexer.next(),
+            Some(Token::String)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "\"Hello, World!\""
+        );
     }
 
     /*#[test]
@@ -33,24 +39,57 @@ mod tests {
         let mut lexer = Token::lexer(r##" "hey!" "##);
 
         lexer.next();
-        
-        assert_eq!(token::to_string(&lexer.slice()), "hey!");
+
+        assert_eq!(
+            token::to_string(&lexer.slice()),
+            "hey!"
+        );
     }
 
     #[test]
     fn identifiers() {
         let mut lexer = Token::lexer("x y z abc Class");
 
-        assert_eq!(lexer.next(), Some(Token::Identifier));
-        assert_eq!(lexer.slice(), "x");
-        assert_eq!(lexer.next(), Some(Token::Identifier));
-        assert_eq!(lexer.slice(), "y");
-        assert_eq!(lexer.next(), Some(Token::Identifier));
-        assert_eq!(lexer.slice(), "z");
-        assert_eq!(lexer.next(), Some(Token::Identifier));
-        assert_eq!(lexer.slice(), "abc");
-        assert_eq!(lexer.next(), Some(Token::Identifier));
-        assert_eq!(lexer.slice(), "Class");
+        assert_eq!(
+            lexer.next(),
+            Some(Token::Identifier)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "x"
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(Token::Identifier)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "y"
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(Token::Identifier)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "z"
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(Token::Identifier)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "abc"
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(Token::Identifier)
+        );
+        assert_eq!(
+            lexer.slice(),
+            "Class"
+        );
     }
 
     /*#[test]

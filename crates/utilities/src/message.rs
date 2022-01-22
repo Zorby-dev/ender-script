@@ -7,17 +7,26 @@ use crate::color::*;
 use crate::cursor::Cursor;
 
 pub mod details {
+
     #[macro_export]
     macro_rules! IllegalCharacter {
         ($chr: expr) => {
-            format!("Character '{}' is not allowed", $chr).as_str()
+            format!(
+                "Character '{}' is not allowed",
+                $chr
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! MissingCharacter {
         ($chr: tt) => {
-            format!("Character '{}' is missing", $chr).as_str()
+            format!(
+                "Character '{}' is missing",
+                $chr
+            )
+            .as_str()
         };
     }
 
@@ -31,7 +40,11 @@ pub mod details {
     #[macro_export]
     macro_rules! MissingMemberDeclaration {
         ($name: tt, $member_type: tt) => {
-            format!("Expected ':' to declare {} '{}'", $name, $member_type).as_str()
+            format!(
+                "Expected ':' to declare {} '{}'",
+                $name, $member_type
+            )
+            .as_str()
         };
     }
 
@@ -49,28 +62,44 @@ pub mod details {
     #[macro_export]
     macro_rules! MissingMemberType {
         ($member_type: tt) => {
-            format!("Expected {} type", $member_type).as_str()
+            format!(
+                "Expected {} type",
+                $member_type
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! MissingMemberTypeColon {
         ($member_type: tt) => {
-            format!("Expected ':' to declare {} type", $member_type).as_str()
+            format!(
+                "Expected ':' to declare {} type",
+                $member_type
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! MissingMemberName {
         ($member_type: tt) => {
-            format!("Expected {} name", $member_type).as_str()
+            format!(
+                "Expected {} name",
+                $member_type
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! MissingCase {
         ($case_type: tt) => {
-            format!("Expected '(' to open {}", $case_type).as_str()
+            format!(
+                "Expected '(' to open {}",
+                $case_type
+            )
+            .as_str()
         };
     }
 
@@ -105,21 +134,34 @@ pub mod details {
     #[macro_export]
     macro_rules! UnknownType {
         ($type_name: expr) => {
-            format!("Type \"{}\" does not exist in this scope", $type_name).as_str()
+            format!(
+                "Type \"{}\" does not exist in this scope",
+                $type_name
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! IntegerBoundsExceeded {
         ($byte_limit: tt) => {
-            format!("Provided integer exceeds the {} byte limit", $byte_limit).as_str()
+            format!(
+                "Provided integer exceeds the {} byte limit",
+                $byte_limit
+            )
+            .as_str()
         };
     }
 
     #[macro_export]
     macro_rules! TypeMismatch {
-        ($expected: tt, $got: tt) => {
-            format!("Expected value of type {}, got {}", $expected, $got).as_str()
+        ($expected: tt, $got: expr) => {
+            format!(
+                "Expected value of type {}, got {}",
+                Cyan!().paint($expected),
+                Cyan!().paint($got)
+            )
+            .as_str()
         };
     }
 
@@ -175,7 +217,13 @@ pub enum MessageType {
     MemberRedeclaration,
 }
 impl MessageType {
-    pub fn parameters(&self) -> (bool, &'static str, &'static str) {
+    pub fn parameters(
+        &self,
+    ) -> (
+        bool,
+        &'static str,
+        &'static str,
+    ) {
         match self {
             /*
             ES 0 00 E
@@ -189,23 +237,91 @@ impl MessageType {
                         - Compiler = 1
                         - Builder  = 2
             */
-            MessageType::IllegalCharacter                    => (true, "ES000E", "Illegal character"),
-            MessageType::MissingExpression                   => (true, "ES001E", "Missing expression"),
-            MessageType::MissingMemberDeclaration            => (true, "ES002E", "Missing member declaration"),
-            MessageType::MissingMemberName                   => (true, "ES003E", "Missing member name"),
-            MessageType::MissingMemberType                   => (true, "ES004E", "Missing member type"),
-            MessageType::MissingMemberTypeOrValueAssignment  => (true, "ES005E", "Missing member type or value assignment"),
-            MessageType::MissingCase                         => (true, "ES006E", "Missing case"),
-            MessageType::MissingCaseClosure                  => (true, "ES007E", "Missing case closure"),
-            MessageType::MissingCaseSeparatorOrClosure       => (true, "ES008E", "Missing case separator or closure"),
-            MessageType::MissingBlock                        => (true, "ES009E", "Missing block"),
-            MessageType::MissingBlockClosure                 => (true, "ES010E", "Missing block closure"),
-            MessageType::MissingBlockSeparatorOrClosure      => (true, "ES011E", "Missing block separator or closure"),
-            MessageType::UnknownType                         => (true, "ES100E", "Unknown type"),
-            MessageType::IntegerBoundsExceeded               => (true, "ES101E", "Integer bounds exceeded"),
-            MessageType::TypeMismatch                        => (true, "ES102E", "Type mismatch"),
-            MessageType::UnknownMember                       => (true, "ES103E", "Unknown member"),
-            MessageType::MemberRedeclaration                 => (true, "ES104E", "Member redeclaration")
+            | MessageType::IllegalCharacter => (
+                true,
+                "ES000E",
+                "Illegal character",
+            ),
+            | MessageType::MissingExpression => (
+                true,
+                "ES001E",
+                "Missing expression",
+            ),
+            | MessageType::MissingMemberDeclaration => (
+                true,
+                "ES002E",
+                "Missing member declaration",
+            ),
+            | MessageType::MissingMemberName => (
+                true,
+                "ES003E",
+                "Missing member name",
+            ),
+            | MessageType::MissingMemberType => (
+                true,
+                "ES004E",
+                "Missing member type",
+            ),
+            | MessageType::MissingMemberTypeOrValueAssignment => (
+                true,
+                "ES005E",
+                "Missing member type or value assignment",
+            ),
+            | MessageType::MissingCase => (
+                true,
+                "ES006E",
+                "Missing case",
+            ),
+            | MessageType::MissingCaseClosure => (
+                true,
+                "ES007E",
+                "Missing case closure",
+            ),
+            | MessageType::MissingCaseSeparatorOrClosure => (
+                true,
+                "ES008E",
+                "Missing case separator or closure",
+            ),
+            | MessageType::MissingBlock => (
+                true,
+                "ES009E",
+                "Missing block",
+            ),
+            | MessageType::MissingBlockClosure => (
+                true,
+                "ES010E",
+                "Missing block closure",
+            ),
+            | MessageType::MissingBlockSeparatorOrClosure => (
+                true,
+                "ES011E",
+                "Missing block separator or closure",
+            ),
+            | MessageType::UnknownType => (
+                true,
+                "ES100E",
+                "Unknown type",
+            ),
+            | MessageType::IntegerBoundsExceeded => (
+                true,
+                "ES101E",
+                "Integer bounds exceeded",
+            ),
+            | MessageType::TypeMismatch => (
+                true,
+                "ES102E",
+                "Type mismatch",
+            ),
+            | MessageType::UnknownMember => (
+                true,
+                "ES103E",
+                "Unknown member",
+            ),
+            | MessageType::MemberRedeclaration => (
+                true,
+                "ES104E",
+                "Member redeclaration",
+            ),
         }
     }
 
@@ -232,15 +348,15 @@ pub struct Message {
 impl Message {
     fn color(&self) -> Color {
         match self.message_type.is_error() {
-            true => Red!(),
-            false => todo!(),
+            | true => Red!(),
+            | false => todo!(),
         }
     }
 
     fn light_color(&self) -> Color {
         match self.message_type.is_error() {
-            true => LightRed!(),
-            false => todo!(),
+            | true => LightRed!(),
+            | false => todo!(),
         }
     }
 
@@ -249,7 +365,10 @@ impl Message {
             return self
                 .color()
                 .bold()
-                .paint(format!("Error {}: ", self.message_type.code()))
+                .paint(format!(
+                    "Error {}: ",
+                    self.message_type.code()
+                ))
                 .to_string();
         }
         panic!();
@@ -275,19 +394,13 @@ impl Message {
             .nth(self.cursor.start.line_num)
             .unwrap()
             .to_string();
-        let first: String = line
-                            .chars()
-                            .take(self.cursor.start.col)
-                            .collect();
+        let first: String = line.chars().take(self.cursor.start.col).collect();
         let err: String = line
-                          .chars()
-                          .skip(self.cursor.start.col)
-                          .take(self.cursor.end.col - self.cursor.start.col)
-                          .collect();
-        let last: String = line
-                           .chars()
-                           .skip(self.cursor.end.col)
-                           .collect();
+            .chars()
+            .skip(self.cursor.start.col)
+            .take(self.cursor.end.col - self.cursor.start.col)
+            .collect();
+        let last: String = line.chars().skip(self.cursor.end.col).collect();
         let strings: &[ANSIString<'static>] = &[
             Grey!().paint(first),
             self.light_color().bold().paint(err),
@@ -337,7 +450,12 @@ impl Message {
         output += &Grey!().paint(padding.clone() + "╭─").to_string();
         output += &(self.file_name() + "\n");
         output += &Grey!().paint(padding.clone() + "│\n").to_string();
-        output += &Grey!().paint(format!(" {} │ ", line_num)).to_string();
+        output += &Grey!()
+            .paint(format!(
+                " {} │ ",
+                line_num
+            ))
+            .to_string();
         output += &(self.line() + "\n");
 
         let content = self.content();

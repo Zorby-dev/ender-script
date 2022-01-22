@@ -1,5 +1,5 @@
-mod environment;
 pub mod compiler;
+mod environment;
 
 #[cfg(test)]
 mod tests {

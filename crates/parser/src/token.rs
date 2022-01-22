@@ -6,7 +6,12 @@ pub fn to_i64(slice: &impl ToString) -> i64 {
 
 pub fn to_string(slice: &impl ToString) -> String {
     let str_slice = slice.to_string();
-    str_slice.as_str().chars().skip(1).take(str_slice.len()-2).collect()
+    str_slice
+        .as_str()
+        .chars()
+        .skip(1)
+        .take(str_slice.len() - 2)
+        .collect()
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
@@ -53,7 +58,6 @@ pub enum Token {
     GreaterThanOrEqual,
     #[token("<=")]
     LessThanOrEqual,*/
-
     #[token("function")]
     Function,
     #[token("let")]
@@ -74,7 +78,6 @@ pub enum Token {
     Or,
     #[token("not")]
     Not,*/
-
     #[regex(r##"[a-zA-Z][a-zA-Z0-9]*"##)]
     Identifier,
     #[regex(r##""(?:\\"|[^"])*""##)]
@@ -86,7 +89,7 @@ pub enum Token {
     NewLine,
     #[error]
     Error,
-    #[regex(r"[ \t\f]+", logos::skip)]
+    #[regex(r"[ \t\f\r]+", logos::skip)]
     Whitespace,
     EoF,
 }

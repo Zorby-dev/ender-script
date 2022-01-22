@@ -1,6 +1,6 @@
-pub mod message;
-pub mod cursor;
 mod color;
+pub mod cursor;
+pub mod message;
 
 #[cfg(test)]
 mod tests {

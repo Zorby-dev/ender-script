@@ -31,22 +31,32 @@ pub enum Value {
     FunctionReference(String),
 }
 
+impl Value {
+    pub fn name(&self) -> &'static str {
+        match self {
+            | Value::Int(_) | Value::IntReference { .. } => "int",
+            | Value::Undefined | Value::UndefinedReference { .. } => "undefined",
+            | Value::FunctionReference(_) => "function",
+        }
+    }
+}
+
 pub struct Scope<'a> {
     pub function: &'a mut McFunction,
     pub symbol_table: HashSet<String>,
-    pub parent: Option<&'a Scope<'a>>
+    pub parent: Option<&'a Scope<'a>>,
 }
 impl<'a> Scope<'a> {
     pub fn new(function: &'a mut McFunction, parent: Option<&'a Scope<'a>>) -> Self {
         Self {
             function,
             symbol_table: HashSet::new(),
-            parent
+            parent,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct Context {
-    pub macro_target: Option<Value>
+    pub macro_target: Option<Value>,
 }
