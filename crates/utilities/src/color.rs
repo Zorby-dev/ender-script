@@ -40,4 +40,4 @@ macro_rules! Cyan {
     };
 }
 
-pub(crate) use {Cyan, /*Yellow, LightYellow,*/ Grey, LightRed, Red};
+pub use {Cyan, /*Yellow, LightYellow,*/ Grey, LightRed, Red};

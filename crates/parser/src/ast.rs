@@ -16,7 +16,7 @@ pub struct Parameter {
 
 #[derive(Debug, Clone)]
 pub struct Argument {
-    expression: Expression,
+    pub expression: Expression,
 }
 
 #[derive(Debug, Clone)]

@@ -621,8 +621,11 @@ impl Compiler {
                 scope.function.push_cmd(string);
                 return Ok(Value::Undefined);
             },
+            Expression::FunctionCall { arguments, cursor, name } 
+            
+            => self.compile_function_call(),
             | Expression::VariableAssign { name, value, cursor } => self.compile_variable_assign(cursor, scope, context, name, value),
-            | Expression::String( .. ) | Expression::FunctionCall { .. } => unimplemented!()
+            | Expression::String( .. ) => unimplemented!()
         }
     }
 }

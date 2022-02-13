@@ -1,4 +1,4 @@
-mod color;
+pub mod color;
 pub mod cursor;
 pub mod message;
 

@@ -6,7 +6,7 @@ use utilities::{
 };
 
 use crate::{
-    ast::{Expression, Parameter, Type},
+    ast::{Expression, Parameter, Type, Argument},
     token::{self, Token},
 };
 
@@ -172,6 +172,39 @@ impl<'a> Parser<'a> {
                             name,
                             value,
                             cursor: self.cursor.clone_with_start(&start)
+                        }
+                    )
+                }
+                else if self.peek == Token::LeftParen {
+                    let mut arguments: Vec<Argument> = Vec::new();
+
+                    let name = self.slice.clone();
+
+                    loop {
+                        match self.current {
+                            | Token::RightParen => {
+                                self.advance();
+                                break;
+                            }
+                            | Token::Comma => {
+                                self.advance();
+                                continue;
+                            }
+                            _ => {
+                                arguments.push(
+                                    Argument {
+                                        expression: self.statement()?
+                                    }
+                                );
+                            }
+                        }
+                    }
+
+                    Ok(
+                        Expression::FunctionCall {
+                            name,
+                            arguments,
+                            cursor: self.cursor.clone()
                         }
                     )
                 }
