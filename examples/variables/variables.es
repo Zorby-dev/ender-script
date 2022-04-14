@@ -1,2 +1,3 @@
-let b = 0
-let a = b = 3
+function a(b: int) {
+    raw "say hello world"
+}

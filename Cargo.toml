@@ -2,6 +2,6 @@
 members = [
    "crates/parser",
    "crates/compiler",
-   "crates/cli",
+   "crates/esc",
    "crates/utilities"
 ]

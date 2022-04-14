@@ -144,6 +144,12 @@ impl<'a> Parser<'a> {
         out
     }
 
+    fn skip_whitespace(&mut self) {
+        while self.current == Token::NewLine {
+            self.advance()
+        }
+    }
+
     fn atom(&mut self) -> Result<Expression, Message> {
         match self.current {
             | Token::Integer => Ok(
@@ -165,6 +171,9 @@ impl<'a> Parser<'a> {
 
                     self.advance();
                     self.advance();
+
+                    self.skip_whitespace();
+
                     let value = Box::new(self.statement()?);
 
                     Ok(
@@ -179,6 +188,12 @@ impl<'a> Parser<'a> {
                     let mut arguments: Vec<Argument> = Vec::new();
 
                     let name = self.slice.clone();
+                    let start = self.cursor.start.clone();
+
+                    self.advance();
+                    self.advance();
+
+                    self.skip_whitespace();
 
                     loop {
                         match self.current {
@@ -188,6 +203,7 @@ impl<'a> Parser<'a> {
                             }
                             | Token::Comma => {
                                 self.advance();
+                                self.skip_whitespace();
                                 continue;
                             }
                             _ => {
@@ -196,6 +212,7 @@ impl<'a> Parser<'a> {
                                         expression: self.statement()?
                                     }
                                 );
+                                self.skip_whitespace();
                             }
                         }
                     }
@@ -204,7 +221,7 @@ impl<'a> Parser<'a> {
                         Expression::FunctionCall {
                             name,
                             arguments,
-                            cursor: self.cursor.clone()
+                            cursor: self.cursor.clone_with_start(&start)
                         }
                     )
                 }
@@ -219,8 +236,14 @@ impl<'a> Parser<'a> {
             },
             | Token::LeftParen => {
                 self.advance();
+
+                self.skip_whitespace();
+
                 let statement = self.statement()?;
+
                 self.advance();
+                self.skip_whitespace();
+
                 self.expect(
                     Token::RightParen,
                     Message::error(
@@ -383,6 +406,7 @@ impl<'a> Parser<'a> {
     fn parse_function(&mut self) -> Result<Expression, Message> {
         let start_pos = self.cursor.start.clone();
 
+        self.skip_whitespace();
         self.advance();
 
         // function name
@@ -394,6 +418,8 @@ impl<'a> Parser<'a> {
                 self.cursor.clone(),
             ),
         )?;
+
+        self.skip_whitespace();
 
         // parameters
 
@@ -455,12 +481,14 @@ impl<'a> Parser<'a> {
                 }
                 | Token::Comma => {
                     self.advance();
+                    self.skip_whitespace();
                     continue;
                 }
                 | Token::Identifier => {
                     let identifier = self.slice.clone();
 
                     self.advance();
+                    self.skip_whitespace();
 
                     self.expect_and_advance(
                         Token::Colon,
@@ -470,6 +498,8 @@ impl<'a> Parser<'a> {
                             self.cursor.clone(),
                         ),
                     )?;
+
+                    self.skip_whitespace();
 
                     let typ = self.expect_identifier_and_advance(
                         Message::error(
@@ -485,6 +515,8 @@ impl<'a> Parser<'a> {
                             type_: Type { name: typ },
                         },
                     );
+
+                    self.skip_whitespace();
                 }
                 | _ => {
                     return Err(
@@ -498,9 +530,13 @@ impl<'a> Parser<'a> {
             }
         }
 
+        self.skip_whitespace();
+
         // return type
 
         let colon = self.suspect(Token::Colon)?;
+
+        self.skip_whitespace();
 
         let return_type = match colon {
             | Some(_) => Some(Type {
@@ -515,6 +551,8 @@ impl<'a> Parser<'a> {
             | None => None,
         };
 
+        self.skip_whitespace();
+
         // block
 
         self.expect_and_advance(
@@ -525,6 +563,8 @@ impl<'a> Parser<'a> {
                 self.cursor.clone(),
             ),
         )?;
+
+        self.skip_whitespace();
 
         if self.current == Token::RightBrace {
             return Ok(
@@ -543,10 +583,12 @@ impl<'a> Parser<'a> {
         loop {
             body.push(self.statement()?);
             self.advance();
+            self.skip_whitespace();
             match self.current {
                 | Token::RightBrace => break,
                 | Token::NewLine => {
                     self.advance();
+                    self.skip_whitespace();
                     continue;
                 }
                 | _ => {
@@ -604,12 +646,16 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Expression, Message> {
-        match self.current {
+        let out = match self.current {
             | Token::Let => self.parse_let(),
             | Token::Function => self.parse_function(),
             | Token::Raw => self.parse_raw(),
             | _ => self.math_expr_2(),
-        }
+        };
+
+        self.skip_whitespace();
+
+        out
     }
 
     fn parse(&mut self) -> Result<Vec<Expression>, Message> {
@@ -619,7 +665,10 @@ impl<'a> Parser<'a> {
             self.advance();
             match self.current {
                 | Token::EoF => break,
-                | Token::NewLine => self.advance(),
+                | Token::NewLine => {
+                    self.advance();
+                    self.skip_whitespace();
+                },
                 | _ => {
                     return Err(
                         Message::error(

@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "esc"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 parser = { path = "../parser" }
 compiler = { path = "../compiler" }
+dialoguer = "0.10.0"
+
+[dependencies.clap]
+version = "3.1.8"
+features = ["cargo"]

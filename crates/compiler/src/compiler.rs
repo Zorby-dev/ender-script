@@ -520,7 +520,7 @@ impl Compiler {
     fn compile_function_declaration(
         &mut self,
         cursor: Cursor,
-        parent: Option<&Scope>,
+        parent: Option<&mut Scope>,
         context: &Context,
         name: String,
         body: Vec<Expression>,
@@ -530,10 +530,21 @@ impl Compiler {
             "scoreboard objectives add {} dummy",
             name
         ));
-        let mut scope = Scope::new(
-            &mut function,
-            parent,
-        );
+        let mut scope: Scope;
+
+        if let Some(parent) = parent {
+            parent.symbol_table.insert(name.clone());
+            scope = Scope::new(
+                &mut function,
+                Some(parent),
+            );
+        }
+        else {
+            scope = Scope::new(
+                &mut function,
+                None,
+            );
+        }
 
         for expression in body {
             self.compile_expression(
@@ -548,6 +559,20 @@ impl Compiler {
 
         self.functions.push(function);
         Ok(Value::FunctionReference(name))
+    }
+
+    fn compile_function_call(&mut self, cursor: &Cursor, scope: &mut Scope, name: String) -> Result<Value, Message> {
+        if scope.symbol_table.contains(&name) {
+            scope.function.push_cmd(format!("function {}", &name));
+            Ok(Value::Undefined)
+        }
+        else {
+            Err(Message::error(
+                UnknownMember,
+                details::UnknownMember!("function", &name),
+                cursor.clone()
+            ))
+        }
     }
 
     fn compile_expression(
@@ -621,9 +646,7 @@ impl Compiler {
                 scope.function.push_cmd(string);
                 return Ok(Value::Undefined);
             },
-            Expression::FunctionCall { arguments, cursor, name } 
-            
-            => self.compile_function_call(),
+            Expression::FunctionCall { arguments, cursor, name } => self.compile_function_call(&cursor, scope, name),
             | Expression::VariableAssign { name, value, cursor } => self.compile_variable_assign(cursor, scope, context, name, value),
             | Expression::String( .. ) => unimplemented!()
         }
