@@ -638,7 +638,7 @@ impl<'a> Parser<'a> {
             Err(
                 Message::error(
                     MissingExpression,
-                    MissingExpression!(),
+                    details::MissingSpecificExpression!("string"),
                     string.get_cursor().clone(),
                 ),
             )

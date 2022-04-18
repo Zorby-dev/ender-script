@@ -9,6 +9,7 @@ edition = "2021"
 parser = { path = "../parser" }
 compiler = { path = "../compiler" }
 dialoguer = "0.10.0"
+json = "0.12.4"
 
 [dependencies.clap]
 version = "3.1.8"

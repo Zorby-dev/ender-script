@@ -38,6 +38,17 @@ pub mod details {
     }
 
     #[macro_export]
+    macro_rules! MissingSpecificExpression {
+        ($spec: tt) => {
+            format!(
+                "Expected {} expression",
+                $spec
+            )
+            .as_str()
+        };
+    }
+
+    #[macro_export]
     macro_rules! MissingMemberDeclaration {
         ($name: tt, $member_type: tt) => {
             format!(
@@ -192,7 +203,7 @@ pub mod details {
         MissingBlockSeparatorOrClosure, MissingCase, MissingCaseClosure,
         MissingCaseSeparatorOrClosure, MissingCharacter, MissingExpression,
         MissingMemberDeclaration, MissingMemberName, MissingMemberType, MissingMemberTypeColon,
-        MissingMemberTypeOrValueAssignment, TypeMismatch, UnknownMember, UnknownType,
+        MissingMemberTypeOrValueAssignment, TypeMismatch, UnknownMember, UnknownType, MissingSpecificExpression
     };
 }
 
